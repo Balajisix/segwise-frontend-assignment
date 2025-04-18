@@ -3,7 +3,6 @@ import Papa from "papaparse";
 import csvText from "../data/creatives.csv?raw";
 import {
   ChevronDown,
-  Filter as FilterIcon,
   ChevronRight,
   X,
   Plus,
