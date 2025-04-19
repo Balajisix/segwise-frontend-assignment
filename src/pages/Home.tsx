@@ -1,18 +1,17 @@
-// src/pages/Home.tsx
 import React, { useState, useEffect } from "react";
 import Papa from "papaparse";
 import { FilterBar, FilterItem } from "../components/FilterBar";
 import DataTable from "../components/DataTable";
 import ChartView from "../components/ChartView";
 import Footer from "../components/Footer";
-import logo from "../assets/segwise-logo.png";
+import logo from "../assets/logo.svg";
 import csvText from "../data/creatives.csv?raw";
 import { BarChart2, Table as TableIcon, ExternalLink } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 export interface CreativeRow {
   [key: string]: string | number;
-  id: number; // Added id field for row identification
+  id: number;
 }
 
 const Home: React.FC = () => {
@@ -46,7 +45,7 @@ const Home: React.FC = () => {
         transformHeader: (h) => h.trim(),
       });
       const data = res.data.map((row, index) => {
-        const cleaned: any = { id: index }; // Add an ID for each row
+        const cleaned: any = { id: index }; // Added an ID for each row
         Object.entries(row).forEach(([k, v]) => {
           cleaned[k.trim()] = typeof v === "string" ? v.trim() : v;
         });
@@ -72,7 +71,7 @@ const Home: React.FC = () => {
     const result = tableData.filter((row) =>
       filters.every((f) => {
         const raw = row[f.category.name];
-        // Numeric?
+
         if (f.isNumeric && f.operator) {
           const val = Number(raw);
           const cmp = Number(f.value);
@@ -206,7 +205,7 @@ const Home: React.FC = () => {
           {/* View Full Details Button */}
           <button 
             onClick={() => handleViewRowDetail(previewRow)}
-            className="w-full mt-4 py-2 bg-blue-500 text-white rounded-md flex items-center justify-center hover:bg-blue-600 transition-colors"
+            className="w-full mt-4 py-2 bg-blue-500 text-white rounded-md flex items-center justify-center hover:bg-blue-600 transition-colors cursor-pointer"
           >
             <span>View Full Details</span>
             <ExternalLink className="ml-2 w-4 h-4" />

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Footer from "../components/Footer";
 import { ArrowLeft, TrendingUp, BarChart, PieChart } from "lucide-react";
-import logo from "../assets/segwise-logo.png";
+import logo from "../assets/logo.svg";
 import { Link } from "react-router-dom";
 import { CreativeRow } from "./Home";
 import Papa from "papaparse";
@@ -32,7 +32,7 @@ const RowDetail: React.FC = () => {
       });
       
       const data = res.data.map((row, index) => {
-        const cleaned: RowData = { id: index };  // Add an ID for each row
+        const cleaned: RowData = { id: index };
         Object.entries(row).forEach(([k, v]) => {
           const key = k.trim();
           cleaned[key] = typeof v === "string" ? v.trim() : v;
@@ -146,7 +146,7 @@ const RowDetail: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
-      {/* Header with modern style */}
+      {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="px-4 md:px-8 lg:px-12 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -222,7 +222,7 @@ const RowDetail: React.FC = () => {
 
             {activeTab === 'overview' && (
               <div className="space-y-6">
-                {/* Key metrics in a visually appealing grid */}
+                {/* Key metrics */}
                 <div className="bg-white p-6 rounded-xl shadow-md">
                   <div className="flex items-center mb-4">
                     <BarChart className="w-5 h-5 mr-2 text-blue-600" />
