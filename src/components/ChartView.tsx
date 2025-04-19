@@ -24,12 +24,13 @@ import {
   LineChart as LineChartIcon, 
   AreaChart as AreaChartIcon, 
   LayoutGrid,
-  Download
+  Download,
+  Maximize2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-// This is the chart config with separate colors
+// Enhanced chart config with richer colors
 const chartConfig = {
   spends: {
     label: "Spend",
@@ -62,6 +63,7 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
   const [activeMetrics, setActiveMetrics] = useState<string[]>(
     ["spends", "impressions", "clicks", "installs"]
   );
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Format numbers for display
   const formatNumber = (value: number): string => {
@@ -122,6 +124,18 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
     }
   };
 
+  // Toggle fullscreen mode
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+    
+    // Add event listener to handle ESC key to exit fullscreen
+    if (!isFullscreen) {
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') setIsFullscreen(false);
+      });
+    }
+  };
+
   // Toggle metrics selection
   const toggleMetric = (value: string) => {
     setActiveMetrics(prev => {
@@ -134,13 +148,13 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
     });
   };
 
-  // Tooltip component
+  // Custom tooltip component with enhanced styling
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white p-4 border rounded-md shadow-lg">
-          <p className="font-medium text-gray-900">{label}</p>
-          <div className="mt-2 space-y-1">
+          <p className="font-medium text-gray-900 border-b pb-2 mb-2">{label}</p>
+          <div className="space-y-2">
             {payload.map((entry: any, index: number) => (
               <div key={index} className="flex items-center gap-2">
                 <div 
@@ -162,21 +176,21 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
     return null;
   };
 
-  // Legend component
+  // Enhanced legend component
   const CustomLegend = ({ payload }: any) => {
     return (
-      <div className="flex flex-wrap justify-center gap-4 mt-2">
+      <div className="flex flex-wrap justify-center gap-5 mt-3">
         {payload.map((entry: any, index: number) => (
           <div 
             key={index} 
-            className="flex items-center gap-1 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 py-1 px-2 rounded-full transition-colors"
             onClick={() => toggleMetric(entry.dataKey)}
           >
             <div 
-              className={`w-3 h-3 rounded-full ${!activeMetrics.includes(entry.dataKey) ? 'opacity-30' : ''}`} 
+              className={`w-4 h-4 rounded-full ${!activeMetrics.includes(entry.dataKey) ? 'opacity-30' : ''}`} 
               style={{ backgroundColor: entry.color }}
             />
-            <span className={`text-sm ${!activeMetrics.includes(entry.dataKey) ? 'text-gray-400' : 'text-gray-700'}`}>
+            <span className={`text-sm font-medium ${!activeMetrics.includes(entry.dataKey) ? 'text-gray-400' : 'text-gray-700'}`}>
               {entry.value}
             </span>
           </div>
@@ -185,62 +199,69 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
     );
   };
 
+  // Calculate chart height based on fullscreen state
+  const chartHeight = isFullscreen ? "calc(100vh - 240px)" : "500px";
+
   return (
-    <Card className="w-full shadow-lg border-t-4 border-t-blue-500">
+    <Card className={`w-full shadow-lg border-t-4 border-t-blue-600 ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''}`}>
       <CardHeader className="pb-2">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
           <div>
-            <CardTitle className="text-xl">Performance Analytics</CardTitle>
-            <CardDescription className="text-gray-500">
+            <CardTitle className="text-2xl font-bold text-gray-800">Performance Analytics</CardTitle>
+            <CardDescription className="text-gray-600 text-base">
               Visualizing campaign metrics across {chartData.length} creatives
             </CardDescription>
           </div>
           
           <div className="flex flex-wrap gap-2">
-            <ToggleGroup type="single" value={chartType} onValueChange={(val) => val && setChartType(val as any)}>
-              <ToggleGroupItem value="bar" aria-label="Bar Chart">
+            <ToggleGroup type="single" value={chartType} onValueChange={(val) => val && setChartType(val as any)} className="bg-gray-50 p-1 rounded-md">
+              <ToggleGroupItem value="bar" aria-label="Bar Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600">
                 <BarChart3 className="h-4 w-4" />
               </ToggleGroupItem>
-              <ToggleGroupItem value="line" aria-label="Line Chart">
+              <ToggleGroupItem value="line" aria-label="Line Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600">
                 <LineChartIcon className="h-4 w-4" />
               </ToggleGroupItem>
-              <ToggleGroupItem value="area" aria-label="Area Chart">
+              <ToggleGroupItem value="area" aria-label="Area Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600">
                 <AreaChartIcon className="h-4 w-4" />
               </ToggleGroupItem>
-              <ToggleGroupItem value="composed" aria-label="Composed Chart">
+              <ToggleGroupItem value="composed" aria-label="Composed Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600">
                 <LayoutGrid className="h-4 w-4" />
               </ToggleGroupItem>
             </ToggleGroup>
             
-            <Button variant="outline" size="icon" onClick={handleDownload}>
+            <Button variant="outline" size="icon" onClick={handleDownload} className="hover:bg-gray-50">
               <Download className="h-4 w-4" />
+            </Button>
+            
+            <Button variant="outline" size="icon" onClick={toggleFullscreen} className="hover:bg-gray-50">
+              <Maximize2 className="h-4 w-4" />
             </Button>
           </div>
         </div>
         
         {/* Metrics Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-          <Badge variant="outline" className="w-full flex flex-col sm:flex-row justify-between p-3">
-            <span className="text-xs sm:text-sm break-words">Total Spend</span>
-            <span className="mt-1 sm:mt-0 text-lg font-bold whitespace-nowrap">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+          <Badge variant="outline" className="w-full flex flex-col sm:flex-row justify-between p-4 rounded-lg border-2 border-purple-100 hover:bg-purple-50 transition-colors">
+            <span className="text-sm font-medium text-gray-700">Total Spend</span>
+            <span className="mt-1 sm:mt-0 text-xl font-bold text-purple-700 whitespace-nowrap">
               ${formatNumber(metrics.totals.spends)}
             </span>
           </Badge>
-          <Badge variant="outline" className="w-full flex flex-col sm:flex-row justify-between p-3">
-            <span className="text-xs sm:text-sm break-words">Impressions</span>
-            <span className="mt-1 sm:mt-0 text-lg font-bold whitespace-nowrap">
+          <Badge variant="outline" className="w-full flex flex-col sm:flex-row justify-between p-4 rounded-lg border-2 border-blue-100 hover:bg-blue-50 transition-colors">
+            <span className="text-sm font-medium text-gray-700">Impressions</span>
+            <span className="mt-1 sm:mt-0 text-xl font-bold text-blue-700 whitespace-nowrap">
               {formatNumber(metrics.totals.impressions)}
             </span>
           </Badge>
-          <Badge variant="outline" className="w-full flex flex-col sm:flex-row justify-between p-3">
-            <span className="text-xs sm:text-sm break-words">CTR</span>
-            <span className="mt-1 sm:mt-0 text-lg font-bold whitespace-nowrap">
+          <Badge variant="outline" className="w-full flex flex-col sm:flex-row justify-between p-4 rounded-lg border-2 border-green-100 hover:bg-green-50 transition-colors">
+            <span className="text-sm font-medium text-gray-700">CTR</span>
+            <span className="mt-1 sm:mt-0 text-xl font-bold text-green-700 whitespace-nowrap">
               {metrics.ctr}%
             </span>
           </Badge>
-          <Badge variant="outline" className="w-full flex flex-col sm:flex-row justify-between p-3">
-            <span className="text-xs sm:text-sm break-words">CVR</span>
-            <span className="mt-1 sm:mt-0 text-lg font-bold whitespace-nowrap">
+          <Badge variant="outline" className="w-full flex flex-col sm:flex-row justify-between p-4 rounded-lg border-2 border-amber-100 hover:bg-amber-50 transition-colors">
+            <span className="text-sm font-medium text-gray-700">CVR</span>
+            <span className="mt-1 sm:mt-0 text-xl font-bold text-amber-700 whitespace-nowrap">
               {metrics.cvr}%
             </span>
           </Badge>
@@ -248,38 +269,40 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
       </CardHeader>
       
       <CardContent>
-        <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-          <div className="w-full h-80">
-
+        <ChartContainer config={chartConfig} className={`w-full ${isFullscreen ? 'h-full' : 'min-h-[400px]'}`}>
+          <div className="w-full" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
               {chartType === "bar" ? (
                 <BarChart
                   data={chartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
                   barGap={10}
-                  barSize={20}
+                  barSize={30}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis
                     dataKey="name"
                     angle={-45}
                     textAnchor="end"
-                    height={70}
+                    height={80}
                     tick={{ fontSize: 12 }}
+                    tickLine={{ stroke: "#e0e0e0" }}
                   />
                   <YAxis
                     yAxisId="left"
                     orientation="left"
                     stroke={chartConfig.spends.color}
                     tickFormatter={formatNumber}
+                    tickLine={{ stroke: "#e0e0e0" }}
                   />
                   <YAxis
                     yAxisId="right"
                     orientation="right"
                     stroke={chartConfig.impressions.color}
                     tickFormatter={formatNumber}
+                    tickLine={{ stroke: "#e0e0e0" }}
                   />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(0,0,0,0.05)" }} />
                   <Legend content={<CustomLegend />} />
                   {activeMetrics.includes('spends') && (
                     <Bar
@@ -287,7 +310,7 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="spends"
                       name="Spend ($)"
                       fill={chartConfig.spends.color}
-                      radius={[4, 4, 0, 0]}
+                      radius={[6, 6, 0, 0]}
                       animationDuration={1000}
                     />
                   )}
@@ -297,7 +320,7 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="impressions"
                       name="Impressions"
                       fill={chartConfig.impressions.color}
-                      radius={[4, 4, 0, 0]}
+                      radius={[6, 6, 0, 0]}
                       animationDuration={1200}
                     />
                   )}
@@ -307,7 +330,7 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="clicks"
                       name="Clicks"
                       fill={chartConfig.clicks.color}
-                      radius={[4, 4, 0, 0]}
+                      radius={[6, 6, 0, 0]}
                       animationDuration={1400}
                     />
                   )}
@@ -317,7 +340,7 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="installs"
                       name="Installs"
                       fill={chartConfig.installs.color}
-                      radius={[4, 4, 0, 0]}
+                      radius={[6, 6, 0, 0]}
                       animationDuration={1600}
                     />
                   )}
@@ -325,17 +348,21 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
               ) : chartType === "line" ? (
                 <LineChart
                   data={chartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis
                     dataKey="name"
                     angle={-45}
                     textAnchor="end"
-                    height={70}
+                    height={80}
                     tick={{ fontSize: 12 }}
+                    tickLine={{ stroke: "#e0e0e0" }}
                   />
-                  <YAxis tickFormatter={formatNumber} />
+                  <YAxis 
+                    tickFormatter={formatNumber} 
+                    tickLine={{ stroke: "#e0e0e0" }}
+                  />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend content={<CustomLegend />} />
                   {activeMetrics.includes('spends') && (
@@ -344,9 +371,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="spends"
                       name="Spend ($)"
                       stroke={chartConfig.spends.color}
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
+                      strokeWidth={3}
+                      dot={{ r: 5, strokeWidth: 2, fill: "white", stroke: chartConfig.spends.color }}
+                      activeDot={{ r: 8, strokeWidth: 2 }}
                       animationDuration={1000}
                     />
                   )}
@@ -356,9 +383,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="impressions"
                       name="Impressions"
                       stroke={chartConfig.impressions.color}
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
+                      strokeWidth={3}
+                      dot={{ r: 5, strokeWidth: 2, fill: "white", stroke: chartConfig.impressions.color }}
+                      activeDot={{ r: 8, strokeWidth: 2 }}
                       animationDuration={1200}
                     />
                   )}
@@ -368,9 +395,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="clicks"
                       name="Clicks"
                       stroke={chartConfig.clicks.color}
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
+                      strokeWidth={3}
+                      dot={{ r: 5, strokeWidth: 2, fill: "white", stroke: chartConfig.clicks.color }}
+                      activeDot={{ r: 8, strokeWidth: 2 }}
                       animationDuration={1400}
                     />
                   )}
@@ -380,9 +407,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="installs"
                       name="Installs"
                       stroke={chartConfig.installs.color}
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
+                      strokeWidth={3}
+                      dot={{ r: 5, strokeWidth: 2, fill: "white", stroke: chartConfig.installs.color }}
+                      activeDot={{ r: 8, strokeWidth: 2 }}
                       animationDuration={1600}
                     />
                   )}
@@ -390,17 +417,21 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
               ) : chartType === "area" ? (
                 <AreaChart
                   data={chartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis
                     dataKey="name"
                     angle={-45}
                     textAnchor="end"
-                    height={70}
+                    height={80}
                     tick={{ fontSize: 12 }}
+                    tickLine={{ stroke: "#e0e0e0" }}
                   />
-                  <YAxis tickFormatter={formatNumber} />
+                  <YAxis 
+                    tickFormatter={formatNumber} 
+                    tickLine={{ stroke: "#e0e0e0" }}
+                  />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend content={<CustomLegend />} />
                   {activeMetrics.includes('spends') && (
@@ -409,9 +440,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="spends"
                       name="Spend ($)"
                       stroke={chartConfig.spends.color}
-                      fill={`${chartConfig.spends.color}40`}
-                      strokeWidth={2}
-                      activeDot={{ r: 6 }}
+                      fill={`${chartConfig.spends.color}30`}
+                      strokeWidth={3}
+                      activeDot={{ r: 8, strokeWidth: 2 }}
                       animationDuration={1000}
                     />
                   )}
@@ -421,9 +452,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="impressions"
                       name="Impressions"
                       stroke={chartConfig.impressions.color}
-                      fill={`${chartConfig.impressions.color}40`}
-                      strokeWidth={2}
-                      activeDot={{ r: 6 }}
+                      fill={`${chartConfig.impressions.color}30`}
+                      strokeWidth={3}
+                      activeDot={{ r: 8, strokeWidth: 2 }}
                       animationDuration={1200}
                     />
                   )}
@@ -433,9 +464,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="clicks"
                       name="Clicks"
                       stroke={chartConfig.clicks.color}
-                      fill={`${chartConfig.clicks.color}40`}
-                      strokeWidth={2}
-                      activeDot={{ r: 6 }}
+                      fill={`${chartConfig.clicks.color}30`}
+                      strokeWidth={3}
+                      activeDot={{ r: 8, strokeWidth: 2 }}
                       animationDuration={1400}
                     />
                   )}
@@ -445,9 +476,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="installs"
                       name="Installs"
                       stroke={chartConfig.installs.color}
-                      fill={`${chartConfig.installs.color}40`}
-                      strokeWidth={2}
-                      activeDot={{ r: 6 }}
+                      fill={`${chartConfig.installs.color}30`}
+                      strokeWidth={3}
+                      activeDot={{ r: 8, strokeWidth: 2 }}
                       animationDuration={1600}
                     />
                   )}
@@ -455,18 +486,28 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
               ) : (
                 <ComposedChart
                   data={chartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis
                     dataKey="name"
                     angle={-45}
                     textAnchor="end"
-                    height={70}
+                    height={80}
                     tick={{ fontSize: 12 }}
+                    tickLine={{ stroke: "#e0e0e0" }}
                   />
-                  <YAxis yAxisId="left" tickFormatter={formatNumber} />
-                  <YAxis yAxisId="right" orientation="right" tickFormatter={formatNumber} />
+                  <YAxis 
+                    yAxisId="left" 
+                    tickFormatter={formatNumber}
+                    tickLine={{ stroke: "#e0e0e0" }}
+                  />
+                  <YAxis 
+                    yAxisId="right" 
+                    orientation="right" 
+                    tickFormatter={formatNumber}
+                    tickLine={{ stroke: "#e0e0e0" }}
+                  />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend content={<CustomLegend />} />
                   {activeMetrics.includes('spends') && (
@@ -475,8 +516,8 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="spends"
                       name="Spend ($)"
                       fill={chartConfig.spends.color}
-                      radius={[4, 4, 0, 0]}
-                      barSize={20}
+                      radius={[6, 6, 0, 0]}
+                      barSize={25}
                       animationDuration={1000}
                     />
                   )}
@@ -487,9 +528,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="impressions"
                       name="Impressions"
                       stroke={chartConfig.impressions.color}
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
+                      strokeWidth={3}
+                      dot={{ r: 5, strokeWidth: 2, fill: "white", stroke: chartConfig.impressions.color }}
+                      activeDot={{ r: 8, strokeWidth: 2 }}
                       animationDuration={1200}
                     />
                   )}
@@ -500,9 +541,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="clicks"
                       name="Clicks"
                       stroke={chartConfig.clicks.color}
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
+                      strokeWidth={3}
+                      dot={{ r: 5, strokeWidth: 2, fill: "white", stroke: chartConfig.clicks.color }}
+                      activeDot={{ r: 8, strokeWidth: 2 }}
                       animationDuration={1400}
                     />
                   )}
@@ -514,8 +555,8 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       name="Installs"
                       stroke={chartConfig.installs.color}
                       fill={`${chartConfig.installs.color}20`}
-                      strokeWidth={2}
-                      activeDot={{ r: 6 }}
+                      strokeWidth={3}
+                      activeDot={{ r: 8, strokeWidth: 2 }}
                       animationDuration={1600}
                     />
                   )}
@@ -524,6 +565,14 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
             </ResponsiveContainer>
           </div>
         </ChartContainer>
+        
+        {isFullscreen && (
+          <div className="absolute bottom-4 right-4">
+            <Button onClick={toggleFullscreen} className="bg-white text-gray-800 hover:bg-gray-100 shadow-lg">
+              Exit Fullscreen
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

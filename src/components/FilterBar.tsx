@@ -4,13 +4,21 @@ import csvText from "../data/creatives.csv?raw";
 import {
   ChevronDown,
   ChevronRight,
-  X,
-  Plus,
+  Funnel,
   Search,
+  Trash2,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 type Tab = "Dimensions" | "Tags" | "Metrics";
-type ComparisonOperator = "equals" | "lesser than" | "greater than" | "contains" | "does not contain" | "is" | "is not";
+type ComparisonOperator =
+  | "equals"
+  | "lesser than"
+  | "greater than"
+  | "contains"
+  | "does not contain"
+  | "is"
+  | "is not";
 
 interface ColDef {
   name: string;
@@ -20,213 +28,153 @@ interface ColDef {
 export interface FilterItem {
   category: ColDef;
   value: string;
-  operator?: ComparisonOperator;
-  isNumeric?: boolean;
+  operator: ComparisonOperator;
+  isNumeric: boolean;
 }
 
-export interface FilterBarProps {
-  onFiltersChange?: (filters: FilterItem[]) => void;
+interface FilterBarProps {
+  onFiltersChange: (filters: FilterItem[], logic: "AND" | "OR") => void;
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({ onFiltersChange }) => {
+  // It loads CSV
   const [cols, setCols] = useState<ColDef[]>([]);
-  const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("Dimensions");
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<ColDef | null>(null);
-  const [selectedValues, setSelectedValues] = useState<string[]>([]);
-  const [appliedFilters, setAppliedFilters] = useState<FilterItem[]>([]);
   const [data, setData] = useState<Record<string, any>[]>([]);
-  const [uniqueValues, setUniqueValues] = useState<string[]>([]);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [filterValue, setFilterValue] = useState<string>("");
-  const [selectedOperator, setSelectedOperator] = useState<ComparisonOperator>("equals");
-  const [operatorMenuOpen, setOperatorMenuOpen] = useState(false);
-  const [multiSelectMode, setMultiSelectMode] = useState(false);
-  const [filterLogic, setFilterLogic] = useState<"AND" | "OR">("AND");
-
   useEffect(() => {
-    const result = Papa.parse<Record<string, any>>(csvText, {
+    const { data: rows, meta } = Papa.parse<Record<string, any>>(csvText, {
       header: true,
       skipEmptyLines: true,
     });
-
-    const parsedData = result.data as Record<string, any>[];
-    const headers = result.meta.fields || [];
-
     const metricKeys = [
-      "ipm",
-      "ctr",
-      "spend",
-      "impressions",
-      "clicks",
-      "cpm",
-      "cost_per_click",
-      "cost_per_install",
-      "installs",
+      "ipm","ctr","spend","impressions","clicks",
+      "cpm","cost_per_click","cost_per_install","installs"
     ];
-
-    const mapped: ColDef[] = headers.map((h) => {
-      const key = h.trim().toLowerCase();
-      let tab: Tab;
-
-      if (key.includes("tag")) {
-        tab = "Tags";
-      } else if (metricKeys.includes(key)) {
-        tab = "Metrics";
-      } else {
-        tab = "Dimensions";
-      }
-
-      return { name: h, type: tab };
-    });
-
-    setCols(mapped);
-    setData(parsedData);
+    setCols(
+      (meta.fields || []).map(h => {
+        const key = h.trim().toLowerCase();
+        if (key.includes("tag")) return { name: h, type: "Tags" };
+        if (metricKeys.includes(key)) return { name: h, type: "Metrics" };
+        return { name: h, type: "Dimensions" };
+      })
+    );
+    setData(rows as any);
   }, []);
 
-  // When filters change, notify parent component
-  useEffect(() => {
-    onFiltersChange?.(appliedFilters);
-  }, [appliedFilters, onFiltersChange]);
+  // AND OR Logic
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState<FilterItem[]>([]);
+  const [logic, setLogic] = useState<"AND"|"OR">("AND");
 
+  const [step, setStep] = useState<1|2|3>(1);
+  const [tab, setTab] = useState<Tab>("Dimensions");
+  const [search, setSearch] = useState("");
+  const [col, setCol] = useState<ColDef|null>(null);
+  const [vals, setVals] = useState<string[]>([]);
+  const [sel, setSel] = useState<string[]>([]);
+  const [single, setSingle] = useState(false);
+
+  // numeric branch
+  const [numOp, setNumOp] = useState<ComparisonOperator>("equals");
+  const [numVal, setNumVal] = useState("");
+  const [opOpen, setOpOpen] = useState(false);
+
+  // string‑only branch
+  const [strOp, setStrOp] = useState<ComparisonOperator>("is");
+
+  const countLabel = pending.length.toString().padStart(2, "0");
+
+  // filterable columns
   const filteredCols = useMemo(
-    () =>
-      cols
-        .filter((c) => c.type === activeTab)
-        .filter((c) => c.name.toLowerCase().includes(search.toLowerCase())),
-    [cols, activeTab, search]
+    () => cols
+      .filter(c => c.type === tab)
+      .filter(c => c.name.toLowerCase().includes(search.toLowerCase())),
+    [cols, tab, search]
   );
 
-  // When a category is selected, find its unique values from the data
+  // when you pick a column, load its values
   useEffect(() => {
-    if (selectedCategory) {
-      const values = data
-        .map((row) => row[selectedCategory.name])
-        .filter(Boolean)
-        .map(String);
+    if (!col) return;
+    const out = data
+      .map(r => r[col.name])
+      .filter(v => v != null)
+      .map(String);
+    setVals(Array.from(new Set(out)).sort());
+  }, [col, data]);
 
-      const unique = Array.from(new Set(values)).sort();
-      setUniqueValues(unique);
-    }
-  }, [selectedCategory, data]);
-
-  const isNumericField = (category: ColDef): boolean => {
-    if (!category) return false;
-    // Check if the field is likely numeric based on the first few values
-    const values = data
-      .slice(0, 10)
-      .map((row) => row[category.name])
-      .filter(Boolean);
-    
-    return values.length > 0 && values.every(value => !isNaN(Number(value)));
+  // detect numeric OR “ID” columns
+  const isNumericField = (c: ColDef) => {
+    if (c.name.toLowerCase().endsWith("id")) return true;
+    const sample = data
+      .slice(0,10)
+      .map(r => r[c.name])
+      .filter(v => v != null);
+    return sample.length>0 && sample.every(v => !isNaN(+v));
   };
 
-  const handleApply = () => {
-    if (selectedCategory) {
-      if (selectedCategory.type === "Metrics" || isNumericField(selectedCategory)) {
-        // For metrics, add a single filter with operator and value
-        setAppliedFilters((prev) => [
-          ...prev,
-          {
-            category: selectedCategory,
-            value: filterValue,
-            operator: selectedOperator,
-            isNumeric: true,
-          },
-        ]);
-      } else if (selectedValues.length > 0) {
-        // For dimensions and tags, add multiple filters based on selected values
-        const newFilters = selectedValues.map((val) => ({
-          category: selectedCategory,
-          value: val,
-          operator: "equals" as ComparisonOperator,
-          isNumeric: false,
-        }));
-        setAppliedFilters((prev) => [...prev, ...newFilters]);
-      }
-    }
-    
-    // Reset everything
-    setSelectedCategory(null);
-    setSelectedValues([]);
-    setFilterValue("");
-    setStep(1);
-    setSearch("");
-    setOpen(false);
-  };
-
-  const handleRemoveFilter = (index: number) => {
-    setAppliedFilters((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSelectValue = (value: string) => {
-    if (multiSelectMode) {
-      setSelectedValues((prev) =>
-        prev.includes(value)
-          ? prev.filter((v) => v !== value)
-          : [...prev, value]
-      );
+  // queue one filter
+  const saveOne = () => {
+    if (!col) return;
+    const numeric = col.type==="Metrics" || isNumericField(col);
+    if (numeric) {
+      if (!numVal) return;
+      setPending(p=>[
+        ...p,
+        { category: col, operator: numOp, value: numVal, isNumeric: true }
+      ]);
     } else {
-      setSelectedValues([value]);
-      if (selectedCategory?.type !== "Metrics") {
-        setStep(3);
-      }
+      if (sel.length===0) return;
+      setPending(p=>[
+        ...p,
+        ...sel.map(v=>({
+          category: col,
+          operator: strOp,
+          value: v,
+          isNumeric: false
+        }))
+      ]);
     }
+    // reset
+    setStep(1); setCol(null); setSel([]); setNumVal(""); setSearch("");
   };
 
-  const handleSelectAll = () => {
-    if (selectedValues.length === uniqueValues.length) {
-      setSelectedValues([]);
-    } else {
-      setSelectedValues([...uniqueValues]);
-    }
-  };
-
-  const renderStepOne = () => (
+  const Step1 = () => (
     <>
       <div className="grid grid-cols-3 border-b">
-        {(["Dimensions", "Tags", "Metrics"] as Tab[]).map((tab) => (
+        {(["Dimensions","Tags","Metrics"] as Tab[]).map(t=>(
           <button
-            key={tab}
-            onClick={() => {
-              setActiveTab(tab);
-              setSearch("");
-            }}
+            key={t}
+            onClick={()=>{ setTab(t); setSearch(""); }}
             className={`py-2 text-sm ${
-              activeTab === tab
-                ? "text-gray-800 font-semibold border-b-2 border-blue-400"
+              tab===t
+                ? "text-gray-800 font-semibold border-b-2 border-green-500"
                 : "text-gray-500"
             }`}
-          >
-            {tab}
-          </button>
+          >{t}</button>
         ))}
       </div>
       <div className="p-4 space-y-2">
         <div className="relative">
           <input
-            type="text"
-            placeholder="Search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
+            onChange={e=>setSearch(e.target.value)}
+            placeholder="Search"
+            className="w-full pl-8 pr-3 py-1.5 border rounded-md text-sm focus:ring-2 focus:ring-green-300"
           />
-          <Search className="absolute left-2 top-1.5 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-2 top-1.5 w-4 h-4 text-gray-400"/>
         </div>
         <ul className="max-h-40 overflow-auto space-y-1">
-          {filteredCols.map((col) => (
+          {filteredCols.map(c=>(
             <li
-              key={col.name}
-              onClick={() => {
-                setSelectedCategory(col);
+              key={c.name}
+              onClick={()=>{
+                setCol(c);
+                setSingle(c.type!=="Metrics");
                 setStep(2);
-                setMultiSelectMode(col.type !== "Metrics");
               }}
-              className="flex justify-between items-center px-3 py-2 hover:bg-gray-100 rounded-md cursor-pointer text-sm text-gray-700"
+              className="flex justify-between items-center px-3 py-2 hover:bg-green-50 rounded-md cursor-pointer text-sm"
             >
-              {col.name}
-              <ChevronRight className="w-4 h-4 text-gray-400" />
+              {c.name}
+              <ChevronRight className="w-4 h-4 text-gray-400"/>
             </li>
           ))}
         </ul>
@@ -234,310 +182,255 @@ export const FilterBar: React.FC<FilterBarProps> = ({ onFiltersChange }) => {
     </>
   );
 
-  const renderStepTwo = () => {
-    const isMetric = selectedCategory?.type === "Metrics" || isNumericField(selectedCategory!);
-
-    if (isMetric) {
+  const Step2 = () => {
+    const numeric = col!.type==="Metrics" || isNumericField(col!);
+    if (numeric) {
       return (
         <div className="p-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-gray-700">
-              {selectedCategory?.name}
-            </div>
-            <button
-              onClick={() => {
-                setSelectedCategory(null);
-                setStep(1);
-              }}
-              className="text-xs text-gray-500 hover:text-gray-700"
-            >
-              ← Back
-            </button>
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">{col!.name}</span>
+            <button className="text-xs text-gray-500" onClick={()=>setStep(1)}>← Back</button>
           </div>
-          
-          <div className="relative">
-            <div className="flex space-x-2">
-              {/* Operator dropdown */}
-              <div className="relative w-1/2">
-                <button
-                  onClick={() => setOperatorMenuOpen(!operatorMenuOpen)}
-                  className="w-full flex items-center justify-between border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700"
-                >
-                  <span className="capitalize">{selectedOperator.replace(/([A-Z])/g, ' $1')}</span>
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                </button>
-                
-                {operatorMenuOpen && (
-                  <ul className="absolute z-30 w-full mt-1 bg-white border rounded-md shadow-lg py-1">
-                    {["equals", "lesser than", "greater than", "is", "is not"].map((op) => (
-                      <li
-                        key={op}
-                        onClick={() => {
-                          setSelectedOperator(op as ComparisonOperator);
-                          setOperatorMenuOpen(false);
-                        }}
-                        className="px-3 py-1.5 text-sm hover:bg-gray-100 cursor-pointer capitalize"
-                      >
-                        {op}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              
-              {/* Value input */}
-              <input
-                type="text"
-                value={filterValue}
-                onChange={(e) => setFilterValue(e.target.value)}
-                placeholder="Enter value"
-                className="w-1/2 px-3 py-1.5 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
-              />
+          <div className="flex space-x-2">
+            <div className="relative w-1/2">
+              <button
+                onClick={() => setOpOpen((o) => !o)}
+                className="w-full flex justify-between items-center border rounded-md px-3 py-1.5 text-sm"
+              >
+                <span className="capitalize">{numOp}</span>
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              </button>
+
+              {opOpen && (
+                <ul className="absolute left-0 right-0 z-30 mt-1 bg-white border rounded-md shadow-lg">
+                  {["equals", "lesser than", "greater than"].map((o) => (
+                    <li
+                      key={o}
+                      onClick={() => {
+                        setNumOp(o as ComparisonOperator);
+                        setOpOpen(false);
+                      }}
+                      className="px-3 py-1.5 hover:bg-gray-100 cursor-pointer capitalize text-sm"
+                    >
+                      {o.charAt(0).toUpperCase() + o.slice(1)}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
+
+            <input
+              value={numVal}
+              onChange={e=>setNumVal(e.target.value)}
+              placeholder="Enter value"
+              className="w-1/2 border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-300"
+            />
           </div>
-          
-          <button 
-            onClick={handleApply}
-            disabled={!filterValue}
-            className={`w-full py-2 rounded-md text-sm font-medium transition ${
-              filterValue 
-                ? "bg-blue-600 text-white hover:bg-blue-700" 
+          <button
+            onClick={saveOne}
+            disabled={!numVal}
+            className={`w-full py-2 rounded-md text-sm font-medium ${
+              numVal
+                ? "bg-green-600 text-white hover:bg-green-700"
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }`}
           >
-            Apply Filter
+            Apply
           </button>
         </div>
       );
     }
-    
+
+    // non‑numeric path
     return (
       <div className="p-4 space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-            <span>{selectedCategory?.type}</span>
-            <ChevronRight className="w-4 h-4 text-gray-400" />
-            <span className="font-semibold">{selectedCategory?.name}</span>
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-2 text-sm font-medium">
+            <span>{col!.type}</span>
+            <ChevronRight className="w-4 h-4 text-gray-400"/>
+            <span className="font-semibold">{col!.name}</span>
           </div>
-          <button
-            onClick={() => {
-              setSelectedCategory(null);
-              setStep(1);
-            }}
-            className="text-xs text-gray-500 hover:text-gray-700"
-          >
-            ← Back
-          </button>
+          <button className="text-xs text-gray-500" onClick={()=>setStep(1)}>← Back</button>
         </div>
-        
         <div className="relative">
           <input
-            type="text"
-            placeholder="Search values"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
+            onChange={e=>setSearch(e.target.value)}
+            placeholder="Search values"
+            className="w-full pl-8 pr-3 py-1.5 border rounded-md text-sm focus:ring-2 focus:ring-green-300"
           />
-          <Search className="absolute left-2 top-1.5 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-2 top-1.5 w-4 h-4 text-gray-400"/>
         </div>
-        
-        <div className="flex items-center justify-between text-xs mb-2">
-          <label className="flex items-center space-x-1 cursor-pointer">
+        <div className="flex justify-between items-center text-xs mb-2">
+          <label className="flex items-center space-x-1">
             <input
               type="checkbox"
-              checked={selectedValues.length === uniqueValues.length && uniqueValues.length > 0}
-              onChange={handleSelectAll}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-300"
+              checked={sel.length>0 && sel.length===vals.length}
+              onChange={()=>
+                setSel(v=> v.length===vals.length ? [] : [...vals])
+              }
+              className="rounded border-gray-300 text-green-600 focus:ring-green-300"
             />
             <span>Select all</span>
           </label>
-          <span className="text-gray-500">
-            {selectedValues.length} selected
-          </span>
+          <span className="text-gray-500">{sel.length} selected</span>
         </div>
-        
         <ul className="max-h-40 overflow-auto space-y-1">
-          {uniqueValues
-            .filter(val => val.toLowerCase().includes(search.toLowerCase()))
-            .map((val) => (
+          {vals.filter(v=>v.toLowerCase().includes(search.toLowerCase()))
+            .map(v=>(
               <li
-                key={val}
-                onClick={() => handleSelectValue(val)}
-                className={`px-3 py-2 rounded-md text-sm cursor-pointer flex items-center ${
-                  selectedValues.includes(val)
-                    ? "bg-blue-50 text-blue-700"
+                key={v}
+                onClick={()=>{
+                  if (single) {
+                    setSel([v]);
+                    setStep(3);
+                  } else {
+                    setSel(prev=> prev.includes(v)
+                      ? prev.filter(x=>x!==v)
+                      : [...prev,v]
+                    );
+                  }
+                }}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm cursor-pointer ${
+                  sel.includes(v)
+                    ? "bg-green-50 text-green-700"
                     : "hover:bg-gray-100 text-gray-700"
                 }`}
               >
                 <input
                   type="checkbox"
-                  checked={selectedValues.includes(val)}
-                  onChange={() => {}}
-                  className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-300"
+                  checked={sel.includes(v)}
+                  readOnly
+                  className="rounded border-gray-300 text-green-600 focus:ring-green-300"
                 />
-                {val}
+                <span>{v}</span>
               </li>
-            ))}
+            ))
+          }
         </ul>
-        
-        <button 
-          onClick={handleApply}
-          disabled={selectedValues.length === 0}
-          className={`w-full py-2 rounded-md text-sm font-medium transition mt-4 ${
-            selectedValues.length > 0
-              ? "bg-blue-600 text-white hover:bg-blue-700" 
+        <button
+          onClick={saveOne}
+          disabled={sel.length===0}
+          className={`w-full py-2 rounded-md text-sm font-medium mt-4 ${
+            sel.length>0
+              ? "bg-green-600 text-white hover:bg-green-700"
               : "bg-gray-200 text-gray-400 cursor-not-allowed"
           }`}
         >
-          Apply Filter{selectedValues.length > 1 ? `s (${selectedValues.length})` : ""}
+          Add {sel.length>1?"Rules":"Rule"}
         </button>
       </div>
     );
   };
 
-  const renderStepThree = () => (
+  const Step3 = () => (
     <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium text-gray-700">
-          Apply filter options
-        </div>
-        <button
-          onClick={() => setStep(2)}
-          className="text-xs text-gray-500 hover:text-gray-700"
-        >
-          ← Back
-        </button>
+      <div className="flex justify-between items-center">
+        <span className="text-sm font-medium">Operator</span>
+        <button className="text-xs text-gray-500" onClick={()=>setStep(2)}>← Back</button>
       </div>
-      
-      <div className="space-y-4">
-        <div className="text-xs font-medium text-gray-500">Filter options</div>
-        <div className="grid grid-cols-2 gap-2">
-          {["equals", "contains", "is", "is not", "does not contain"].map((op) => (
-            <button
-              key={op}
-              onClick={() => setSelectedOperator(op as ComparisonOperator)}
-              className={`py-2 px-3 text-sm border rounded-md ${
-                selectedOperator === op
-                  ? "bg-blue-50 border-blue-300 text-blue-700"
-                  : "border-gray-200 text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              {op}
-            </button>
-          ))}
-        </div>
+      <div className="space-y-2">
+        {["is","is not","contains","does not contain","equals"].map(o=>(
+          <button
+            key={o}
+            onClick={()=>setStrOp(o as ComparisonOperator)}
+            className={`w-full text-left py-2 px-3 text-sm border rounded-md ${
+              strOp===o
+                ? "bg-green-50 border-green-300 text-green-700"
+                : "border-gray-200 text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            {o.charAt(0).toUpperCase() + o.slice(1)}
+          </button>
+        ))}
       </div>
-      
       <button
-        onClick={handleApply}
-        className="w-full bg-blue-600 text-white py-2 text-sm font-medium hover:bg-blue-700 rounded-md transition"
+        onClick={saveOne}
+        className="w-full bg-green-600 text-white py-2 text-sm font-medium rounded-md hover:bg-green-700 transition"
       >
-        Apply Filters
+        Apply
       </button>
     </div>
   );
 
-  const renderActiveStep = () => {
-    switch (step) {
-      case 1:
-        return renderStepOne();
-      case 2:
-        return renderStepTwo();
-      case 3:
-        return renderStepThree();
-    }
-  };
-
   return (
-    <div className="relative w-full px-4 sm:px-6 md:px-8 lg:px-12">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="w-full bg-gray-100 rounded-xl px-4 py-3">
+      <div className="inline-block">
         <button
-          onClick={() => {
-            setOpen(true);
-            setStep(1);
-          }}
-          className="flex items-center gap-2 bg-white shadow-sm border border-gray-200 rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+          onClick={() => setOpen((o) => !o)}
+          className={`
+            flex items-center gap-2
+            bg-white border border-gray-200
+            rounded-full px-4 py-2
+            text-sm font-medium text-gray-700
+            shadow-sm hover:bg-gray-100
+          `}
         >
-          <Plus className="w-4 h-4 text-gray-500" />
-          Add Filter
+          <Funnel className="w-4 h-4 text-gray-500" />
+          <span>Filters</span>
+          <Badge
+            variant="secondary"
+            className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-semibold"
+          >
+            {countLabel}
+          </Badge>
+          <ChevronDown className="w-4 h-4 text-gray-500" />
         </button>
-        
-        {appliedFilters.length > 0 && (
-          <div className="flex flex-wrap gap-2 items-center">
-            {appliedFilters.map((filter, index) => (
-              <div
-                key={index}
-                className="bg-blue-50 border border-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center gap-2"
-              >
-                <span className="font-medium">{filter.category.name}</span>
-                {filter.isNumeric && (
-                  <span>{filter.operator}</span>
-                )}
-                <span>{filter.value}</span>
-                <button
-                  onClick={() => handleRemoveFilter(index)}
-                  className="text-blue-400 hover:text-blue-700"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-            
-            {appliedFilters.length > 1 && (
-              <div className="flex items-center border border-gray-200 rounded-md p-1 bg-white">
-                <button
-                  onClick={() => setFilterLogic("AND")}
-                  className={`px-2 py-0.5 text-xs rounded ${
-                    filterLogic === "AND"
-                      ? "bg-gray-100 text-gray-800 font-medium"
-                      : "text-gray-500"
-                  }`}
-                >
-                  AND
-                </button>
-                <button
-                  onClick={() => setFilterLogic("OR")}
-                  className={`px-2 py-0.5 text-xs rounded ${
-                    filterLogic === "OR"
-                      ? "bg-gray-100 text-gray-800 font-medium"
-                      : "text-gray-500"
-                  }`}
-                >
-                  OR
-                </button>
-              </div>
-            )}
-            
-            {appliedFilters.length > 0 && (
-              <button
-                onClick={() => setAppliedFilters([])}
-                className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700"
-              >
-                Clear all
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Filter Dialog */}
       {open && (
         <>
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-30 z-10"
-            onClick={() => setOpen(false)}
+          <div
+            className="fixed inset-0 bg-black bg-opacity-20 z-10"
+            onClick={()=>setOpen(false)}
           />
-          <div className="absolute z-20 mt-2 w-full sm:w-[28rem] bg-white rounded-xl shadow-xl overflow-hidden border border-gray-200">
-            <div className="flex items-center justify-between px-4 py-2 border-b">
-              <h3 className="font-medium text-gray-700">Add Filter</h3>
-              <button 
-                onClick={() => setOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
+          <div className="absolute z-20 mt-2 w-full sm:w-[28rem] bg-white rounded-xl shadow-xl border border-gray-200 overflow-visible">
+            <div className="flex justify-between items-center px-4 py-2 border-b">
+              <h3 className="font-medium text-gray-700">Add Filters</h3>
+              <button
+                onClick={()=>{
+                  onFiltersChange(pending, logic);
+                  setOpen(false);
+                }}
+                className="text-green-600 text-sm font-semibold hover:underline"
               >
-                <X className="w-4 h-4" />
+                Apply All
               </button>
             </div>
-            {renderActiveStep()}
+            <div className="p-4 space-y-2">
+              {pending.map((r,i)=>(
+                <div
+                  key={i}
+                  className="bg-green-50 border border-green-100 text-green-800 px-3 py-2 rounded-md flex justify-between text-sm"
+                >
+                  <div>
+                    <span className="font-medium">{r.category.name}</span>{" "}
+                    {r.operator} <em className="font-semibold">{r.value}</em>
+                  </div>
+                  <button onClick={()=>setPending(p=>p.filter((_,idx)=>idx!==i))}>
+                    <Trash2 className="w-4 h-4 hover:text-red-600"/>
+                  </button>
+                </div>
+              ))}
+              {pending.length>=2 && (
+                <div className="flex justify-center space-x-2 py-2">
+                  {(["AND","OR"] as const).map(L=>(
+                    <button
+                      key={L}
+                      onClick={()=>setLogic(L)}
+                      className={`px-3 py-1 text-xs rounded-md ${
+                        logic===L
+                          ? "bg-gray-100 text-gray-800 font-semibold"
+                          : "text-gray-500 hover:bg-gray-50"
+                      }`}
+                    >{L}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {step===1 && <Step1 />}
+            {step===2 && <Step2 />}
+            {step===3 && <Step3 />}
           </div>
         </>
       )}
