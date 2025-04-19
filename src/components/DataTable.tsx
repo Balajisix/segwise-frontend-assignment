@@ -1,5 +1,18 @@
 import { useState, useMemo } from "react";
-import { ChevronDown, ChevronUp, Search, XCircle } from "lucide-react";
+import { Search, X, ArrowUpDown } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface DataTableProps<Row> {
   data: Row[];
@@ -10,7 +23,7 @@ interface DataTableProps<Row> {
 const DataTable = <Row extends Record<string, any>>({
   data,
   onRowClick,
-  title = "Data Table"
+  title = "Data Table",
 }: DataTableProps<Row>) => {
   const [search, setSearch] = useState("");
   const [sortConfig, setSortConfig] = useState<{
@@ -18,25 +31,25 @@ const DataTable = <Row extends Record<string, any>>({
     direction: "asc" | "desc";
   } | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
-  const [showColumnSelector, setShowColumnSelector] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
-  // Derive column list from first row
+  // Derive columns from data
   const columns = useMemo(() => {
     return data.length > 0 ? Object.keys(data[0]) : [];
   }, [data]);
 
-  // Initialize visible columns if not set
+  // Initialize visible columns
   useMemo(() => {
     if (visibleColumns.length === 0 && columns.length > 0) {
       setVisibleColumns(columns);
     }
   }, [columns, visibleColumns]);
 
-  // 1) Global search filter
+  // Global search filter
   const filtered = useMemo(() => {
     const term = search.toLowerCase();
     if (!term) return data;
-    
     return data.filter((row) =>
       columns.some((col) => {
         const cell = row[col];
@@ -48,193 +61,237 @@ const DataTable = <Row extends Record<string, any>>({
     );
   }, [data, search, columns]);
 
-  // 2) Sorting
+  // Sorting logic
   const sorted = useMemo(() => {
     if (!sortConfig) return filtered;
     const { key, direction } = sortConfig;
     return [...filtered].sort((a, b) => {
       const aVal = a[key];
       const bVal = b[key];
-      // handle null/undefined
       if (aVal == null && bVal == null) return 0;
       if (aVal == null) return 1;
       if (bVal == null) return -1;
-      // numeric vs string
-      if (typeof aVal === "number" && typeof bVal === "number") {
-        return direction === "asc" ? aVal - bVal : bVal - aVal;
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return direction === 'asc' ? aVal - bVal : bVal - aVal;
       }
-      return direction === "asc"
+      return direction === 'asc'
         ? String(aVal).localeCompare(String(bVal))
         : String(bVal).localeCompare(String(aVal));
     });
   }, [filtered, sortConfig]);
 
+  // Handle sort requests
   const requestSort = (key: string) => {
     let direction: "asc" | "desc" = "asc";
     if (sortConfig?.key === key && sortConfig.direction === "asc") {
       direction = "desc";
     }
     setSortConfig({ key, direction });
+    setCurrentPage(1);
   };
 
+  // Pagination calculations
+  const totalPages = Math.max(Math.ceil(sorted.length / itemsPerPage), 1);
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return sorted.slice(start, start + itemsPerPage);
+  }, [sorted, currentPage]);
+
+  // Column toggle
   const toggleColumn = (col: string) => {
     if (visibleColumns.includes(col)) {
-      if (visibleColumns.length > 1) { // Prevent hiding all columns
-        setVisibleColumns(visibleColumns.filter(c => c !== col));
+      if (visibleColumns.length > 1) {
+        setVisibleColumns(visibleColumns.filter((c) => c !== col));
       }
     } else {
       setVisibleColumns([...visibleColumns, col]);
     }
   };
 
+  // Clear search
   const clearSearch = () => {
     setSearch("");
+    setCurrentPage(1);
+  };
+
+  // Format column display name
+  const formatColumnName = (col: string) => {
+    return col.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-4 md:p-6 max-w-full">
-      {/* Header with Title */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-        <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 md:mb-0">{title}</h2>
-        
-        <div className="flex flex-col md:flex-row gap-3">
-          {/* Column Selector Button */}
-          <button
-            onClick={() => setShowColumnSelector(!showColumnSelector)}
-            className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors text-sm font-medium"
-          >
-            Columns
-          </button>
-          
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search in table..."
-              className="pl-10 pr-10 py-2 border border-gray-200 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
-            />
-            {search && (
-              <button 
-                onClick={clearSearch}
-                className="absolute right-3 top-2.5"
-              >
-                <XCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-      
-      {/* Column Selector Dropdown */}
-      {showColumnSelector && (
-        <div className="mb-4 p-4 bg-gray-50 rounded-md border border-gray-200">
-          <h3 className="font-medium mb-2 text-gray-700">Toggle Columns</h3>
-          <div className="flex flex-wrap gap-2">
-            {columns.map(col => (
-              <label key={col} className="inline-flex items-center">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.includes(col)}
-                  onChange={() => toggleColumn(col)}
-                  className="rounded text-indigo-600 focus:ring-indigo-500 mr-1"
-                />
-                <span className="text-sm text-gray-700 capitalize">{col.replace(/_/g, " ")}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Table Container */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              {columns
-                .filter(col => visibleColumns.includes(col))
-                .map((col) => (
-                <th
-                  key={col}
-                  onClick={() => requestSort(col)}
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+    <Card className="w-full shadow-md">
+      <CardHeader className="pb-2">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+          <CardTitle>{title}</CardTitle>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 lg:h-9">
+                  Columns
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {columns.map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={col}
+                    checked={visibleColumns.includes(col)}
+                    onCheckedChange={() => toggleColumn(col)}
+                  >
+                    {formatColumnName(col)}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="relative flex items-center">
+              <Search className="absolute left-2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search in table..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8 pr-8 h-8 lg:h-9 w-full md:w-64 lg:w-80"
+              />
+              {search && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 h-6 w-6 p-0 rounded-full"
+                  onClick={clearSearch}
                 >
-                  <div className="flex items-center">
-                    <span className="capitalize">{col.replace(/_/g, " ")}</span>
-                    <span className="ml-1 flex flex-col">
-                      <ChevronUp 
-                        className={`h-3 w-3 ${sortConfig?.key === col && sortConfig.direction === 'asc' ? 'text-indigo-500' : 'text-gray-300'}`} 
-                      />
-                      <ChevronDown 
-                        className={`h-3 w-3 mt-0.5 ${sortConfig?.key === col && sortConfig.direction === 'desc' ? 'text-indigo-500' : 'text-gray-300'}`} 
-                      />
-                    </span>
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {sorted.map((row, idx) => (
-              <tr 
-                key={idx} 
-                onClick={() => onRowClick?.(row)} 
-                className="transition-colors hover:bg-indigo-50 cursor-pointer"
-              >
-                {columns
-                  .filter(col => visibleColumns.includes(col))
-                  .map((col) => {
-                  const cellValue = row[col] ?? "";
-                  
-                  // Handle different data types for better display
-                  let displayValue = cellValue;
-                  if (typeof cellValue === 'boolean') {
-                    displayValue = cellValue ? 'Yes' : 'No';
-                  } else if (cellValue instanceof Date) {
-                    displayValue = cellValue.toLocaleDateString();
-                  }
-                  
-                  return (
-                    <td
-                      key={col}
-                      className="px-4 py-3 whitespace-nowrap text-sm text-gray-700"
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="rounded-md border">
+          <div className="relative w-full overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {columns
+                    .filter((col) => visibleColumns.includes(col))
+                    .map((col) => (
+                      <TableHead key={col} className="whitespace-nowrap">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 p-0 font-semibold"
+                          onClick={() => requestSort(col)}
+                        >
+                          {formatColumnName(col)}
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                          {sortConfig?.key === col && (
+                            <Badge variant="outline" className="ml-2 px-1">
+                              {sortConfig.direction === "asc" ? "↑" : "↓"}
+                            </Badge>
+                          )}
+                        </Button>
+                      </TableHead>
+                    ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedData.length > 0 ? (
+                  paginatedData.map((row, idx) => (
+                    <TableRow
+                      key={idx}
+                      onClick={() => onRowClick?.(row)}
+                      className={onRowClick ? "cursor-pointer hover:bg-muted" : ""}
                     >
-                      {displayValue}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+                      {columns
+                        .filter((col) => visibleColumns.includes(col))
+                        .map((col) => {
+                          const cellValue = row[col] ?? '';
+                          let displayValue = cellValue;
+                          
+                          if (typeof cellValue === 'boolean') {
+                            displayValue = cellValue ? 'Yes' : 'No';
+                          } else if (cellValue instanceof Date) {
+                            displayValue = cellValue.toLocaleDateString();
+                          }
+                          
+                          return (
+                            <TableCell key={col} className="py-2">
+                              {displayValue}
+                            </TableCell>
+                          );
+                        })}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={visibleColumns.length}
+                      className="h-24 text-center"
+                    >
+                      No results found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
 
-            {sorted.length === 0 && (
-              <tr>
-                <td
-                  colSpan={visibleColumns.length}
-                  className="px-4 py-6 text-center text-gray-500 text-sm"
-                >
-                  No matching records found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      
-      {/* Table Footer/Summary */}
-      <div className="mt-4 text-sm text-gray-600 flex justify-between items-center">
-        <span>
-          Showing {sorted.length} of {data.length} records
-        </span>
-        
-        {search && (
-          <span className="text-indigo-600">
-            Filtered by: "{search}"
-          </span>
-        )}
-      </div>
-    </div>
+        {/* Pagination */}
+        <div className="flex items-center justify-between space-x-4 py-4">
+          <div className="text-sm text-muted-foreground">
+            Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+            {Math.min(currentPage * itemsPerPage, sorted.length)} of{" "}
+            {sorted.length} entries
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={pageNum === currentPage ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 w-8"
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
