@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -64,6 +64,22 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
     ["spends", "impressions", "clicks", "installs"]
   );
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [screenWidth, setScreenWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  // Handle responsive detection
+  useEffect(() => {
+    const handleResize = () => {
+      setScreenWidth(window.innerWidth);
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    // Set initial state
+    handleResize();
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Format numbers for display
   const formatNumber = (value: number): string => {
@@ -77,8 +93,11 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
 
   // Transform data with useMemo for optimization
   const chartData = useMemo(() => {
-    return data.map((row) => ({
-      name: String(row.creative_name || row.campaign || ""),
+    // If mobile and there are many data points, trim down
+    const processedData = data.map((row) => ({
+      name: isMobile ? 
+        (String(row.creative_name || row.campaign || "").substring(0, 10) + (String(row.creative_name || row.campaign || "").length > 10 ? "..." : "")) : 
+        String(row.creative_name || row.campaign || ""),
       spends: Number(row.spend) || 0,
       impressions: Number(row.impressions) || 0,
       clicks: Number(row.clicks) || 0,
@@ -87,7 +106,14 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
       ctr: row.impressions ? ((Number(row.clicks) / Number(row.impressions)) * 100).toFixed(2) : "0",
       cvr: row.clicks ? ((Number(row.installs) / Number(row.clicks)) * 100).toFixed(2) : "0",
     }));
-  }, [data]);
+
+    // If too many items for mobile, limit the number of displayed items
+    if (isMobile && processedData.length > 6) {
+      return processedData.slice(0, 6); // Show only top 6 on mobile
+    }
+    
+    return processedData;
+  }, [data, isMobile]);
 
   // Calculate totals and averages
   const metrics = useMemo(() => {
@@ -152,13 +178,13 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white p-4 border rounded-md shadow-lg">
-          <p className="font-medium text-gray-900 border-b pb-2 mb-2">{label}</p>
-          <div className="space-y-2">
+        <div className="bg-white p-2 sm:p-4 border rounded-md shadow-lg max-w-xs sm:max-w-sm">
+          <p className="font-medium text-gray-900 border-b pb-1 sm:pb-2 mb-1 sm:mb-2 text-sm sm:text-base truncate">{label}</p>
+          <div className="space-y-1 sm:space-y-2">
             {payload.map((entry: any, index: number) => (
-              <div key={index} className="flex items-center gap-2">
+              <div key={index} className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                 <div 
-                  className="w-3 h-3 rounded-full" 
+                  className="w-2 h-2 sm:w-3 sm:h-3 rounded-full" 
                   style={{ backgroundColor: entry.color }}
                 />
                 <span className="text-gray-600">{entry.name}:</span>
@@ -179,18 +205,18 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
   // Enhanced legend component
   const CustomLegend = ({ payload }: any) => {
     return (
-      <div className="flex flex-wrap justify-center gap-5 mt-3">
+      <div className="flex flex-wrap justify-center gap-2 sm:gap-5 mt-1 sm:mt-3 px-1">
         {payload.map((entry: any, index: number) => (
           <div 
             key={index} 
-            className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 py-1 px-2 rounded-full transition-colors"
+            className="flex items-center gap-1 sm:gap-2 cursor-pointer hover:bg-gray-50 py-1 px-2 rounded-full transition-colors"
             onClick={() => toggleMetric(entry.dataKey)}
           >
             <div 
-              className={`w-4 h-4 rounded-full ${!activeMetrics.includes(entry.dataKey) ? 'opacity-30' : ''}`} 
+              className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full ${!activeMetrics.includes(entry.dataKey) ? 'opacity-30' : ''}`} 
               style={{ backgroundColor: entry.color }}
             />
-            <span className={`text-sm font-medium ${!activeMetrics.includes(entry.dataKey) ? 'text-gray-400' : 'text-gray-700'}`}>
+            <span className={`text-xs sm:text-sm font-medium ${!activeMetrics.includes(entry.dataKey) ? 'text-gray-400' : 'text-gray-700'}`}>
               {entry.value}
             </span>
           </div>
@@ -199,94 +225,115 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
     );
   };
 
-  // Calculate chart height based on fullscreen state
-  const chartHeight = isFullscreen ? "calc(100vh - 240px)" : "500px";
+  // Calculate chart height based on fullscreen state and device
+  const chartHeight = isFullscreen 
+    ? "calc(100vh - 240px)" 
+    : isMobile ? "300px" : screenWidth < 1024 ? "400px" : "500px";
+
+  // Adjust XAxis angle based on screen size
+  const xAxisAngle = isMobile ? -65 : screenWidth < 1024 ? -55 : -45;
+  
+  // Adjust bar size for different screen sizes
+  const barSize = isMobile ? 15 : screenWidth < 1024 ? 20 : 30;
+  
+  // Adjust margins for different screen sizes
+  const chartMargin = isMobile 
+    ? { top: 15, right: 10, left: 5, bottom: 80 }
+    : screenWidth < 1024 
+      ? { top: 20, right: 20, left: 15, bottom: 80 }
+      : { top: 20, right: 30, left: 20, bottom: 80 };
+
+  // Decide whether to show both Y axes on small screens
+  const showRightYAxis = !isMobile || isFullscreen;
 
   return (
     <Card className={`w-full shadow-lg border-t-4 border-t-blue-600 ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''}`}>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 px-3 sm:px-6">
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
           <div>
-            <CardTitle className="text-2xl font-bold text-gray-800">Performance Analytics</CardTitle>
-            <CardDescription className="text-gray-600 text-base">
-              Visualizing campaign metrics across {chartData.length} creatives
+            <CardTitle className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800">Performance Analytics</CardTitle>
+            <CardDescription className="text-gray-600 text-sm sm:text-base">
+              {isMobile 
+                ? `Showing top ${chartData.length} creatives` 
+                : `Visualizing campaign metrics across ${data.length} creatives`}
             </CardDescription>
           </div>
           
           <div className="flex flex-wrap gap-2">
             <ToggleGroup type="single" value={chartType} onValueChange={(val) => val && setChartType(val as any)} className="bg-gray-50 p-1 rounded-md">
               <ToggleGroupItem value="bar" aria-label="Bar Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600 cursor-pointer">
-                <BarChart3 className="h-4 w-4" />
+                <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
               </ToggleGroupItem>
               <ToggleGroupItem value="line" aria-label="Line Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600 cursor-pointer">
-                <LineChartIcon className="h-4 w-4" />
+                <LineChartIcon className="h-3 w-3 sm:h-4 sm:w-4" />
               </ToggleGroupItem>
               <ToggleGroupItem value="area" aria-label="Area Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600 cursor-pointer">
-                <AreaChartIcon className="h-4 w-4" />
+                <AreaChartIcon className="h-3 w-3 sm:h-4 sm:w-4" />
               </ToggleGroupItem>
               <ToggleGroupItem value="composed" aria-label="Composed Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600 cursor-pointer">
-                <LayoutGrid className="h-4 w-4" />
+                <LayoutGrid className="h-3 w-3 sm:h-4 sm:w-4" />
               </ToggleGroupItem>
             </ToggleGroup>
             
-            <Button variant="outline" size="icon" onClick={handleDownload} className="hover:bg-gray-50 cursor-pointer">
-              <Download className="h-4 w-4" />
+            <Button variant="outline" size="icon" onClick={handleDownload} className="hover:bg-gray-50 cursor-pointer h-8 w-8">
+              <Download className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
             
-            <Button variant="outline" size="icon" onClick={toggleFullscreen} className="hover:bg-gray-50 cursor-pointer">
-              <Maximize2 className="h-4 w-4" />
+            <Button variant="outline" size="icon" onClick={toggleFullscreen} className="hover:bg-gray-50 cursor-pointer h-8 w-8">
+              <Maximize2 className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           </div>
         </div>
         
         {/* Metrics Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-          <Badge variant="outline" className="w-full flex flex-col sm:flex-row justify-between p-4 rounded-lg border-2 border-purple-100 hover:bg-purple-50 transition-colors">
-            <span className="text-sm font-medium text-gray-700">Total Spend</span>
-            <span className="mt-1 sm:mt-0 text-xl font-bold text-purple-700 whitespace-nowrap">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mt-4 sm:mt-6">
+          <Badge variant="outline" className="w-full flex flex-col justify-between p-2 sm:p-4 rounded-lg border-2 border-purple-100 hover:bg-purple-50 transition-colors">
+            <span className="text-xs sm:text-sm font-medium text-gray-700">Total Spend</span>
+            <span className="mt-1 text-base sm:text-xl font-bold text-purple-700 whitespace-nowrap">
               ${formatNumber(metrics.totals.spends)}
             </span>
           </Badge>
-          <Badge variant="outline" className="w-full flex flex-col sm:flex-row justify-between p-4 rounded-lg border-2 border-blue-100 hover:bg-blue-50 transition-colors">
-            <span className="text-sm font-medium text-gray-700">Impressions</span>
-            <span className="mt-1 sm:mt-0 text-xl font-bold text-blue-700 whitespace-nowrap">
+          <Badge variant="outline" className="w-full flex flex-col justify-between p-2 sm:p-4 rounded-lg border-2 border-blue-100 hover:bg-blue-50 transition-colors">
+            <span className="text-xs sm:text-sm font-medium text-gray-700">Impressions</span>
+            <span className="mt-1 text-base sm:text-xl font-bold text-blue-700 whitespace-nowrap">
               {formatNumber(metrics.totals.impressions)}
             </span>
           </Badge>
-          <Badge variant="outline" className="w-full flex flex-col sm:flex-row justify-between p-4 rounded-lg border-2 border-green-100 hover:bg-green-50 transition-colors">
-            <span className="text-sm font-medium text-gray-700">CTR</span>
-            <span className="mt-1 sm:mt-0 text-xl font-bold text-green-700 whitespace-nowrap">
+          <Badge variant="outline" className="w-full flex flex-col justify-between p-2 sm:p-4 rounded-lg border-2 border-green-100 hover:bg-green-50 transition-colors">
+            <span className="text-xs sm:text-sm font-medium text-gray-700">CTR</span>
+            <span className="mt-1 text-base sm:text-xl font-bold text-green-700 whitespace-nowrap">
               {metrics.ctr}%
             </span>
           </Badge>
-          <Badge variant="outline" className="w-full flex flex-col sm:flex-row justify-between p-4 rounded-lg border-2 border-amber-100 hover:bg-amber-50 transition-colors">
-            <span className="text-sm font-medium text-gray-700">CVR</span>
-            <span className="mt-1 sm:mt-0 text-xl font-bold text-amber-700 whitespace-nowrap">
+          <Badge variant="outline" className="w-full flex flex-col justify-between p-2 sm:p-4 rounded-lg border-2 border-amber-100 hover:bg-amber-50 transition-colors">
+            <span className="text-xs sm:text-sm font-medium text-gray-700">CVR</span>
+            <span className="mt-1 text-base sm:text-xl font-bold text-amber-700 whitespace-nowrap">
               {metrics.cvr}%
             </span>
           </Badge>
         </div>
       </CardHeader>
       
-      <CardContent>
-        <ChartContainer config={chartConfig} className={`w-full ${isFullscreen ? 'h-full' : 'min-h-[400px]'}`}>
+      <CardContent className="px-2 sm:px-6">
+        <ChartContainer config={chartConfig} className={`w-full ${isFullscreen ? 'h-full' : 'min-h-[300px] sm:min-h-[400px]'}`}>
           <div className="w-full" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
               {chartType === "bar" ? (
                 <BarChart
                   data={chartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
-                  barGap={10}
-                  barSize={30}
+                  margin={chartMargin}
+                  barGap={isMobile ? 5 : 10}
+                  barSize={barSize}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis
                     dataKey="name"
-                    angle={-45}
+                    angle={xAxisAngle}
                     textAnchor="end"
                     height={80}
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: isMobile ? 10 : 12 }}
                     tickLine={{ stroke: "#e0e0e0" }}
+                    interval={0}
                   />
                   <YAxis
                     yAxisId="left"
@@ -294,14 +341,20 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                     stroke={chartConfig.spends.color}
                     tickFormatter={formatNumber}
                     tickLine={{ stroke: "#e0e0e0" }}
+                    width={isMobile ? 40 : 60}
+                    fontSize={isMobile ? 10 : 12}
                   />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    stroke={chartConfig.impressions.color}
-                    tickFormatter={formatNumber}
-                    tickLine={{ stroke: "#e0e0e0" }}
-                  />
+                  {showRightYAxis && (
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      stroke={chartConfig.impressions.color}
+                      tickFormatter={formatNumber}
+                      tickLine={{ stroke: "#e0e0e0" }}
+                      width={isMobile ? 40 : 60}
+                      fontSize={isMobile ? 10 : 12}
+                    />
+                  )}
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(0,0,0,0.05)" }} />
                   <Legend content={<CustomLegend />} />
                   {activeMetrics.includes('spends') && (
@@ -316,7 +369,7 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                   )}
                   {activeMetrics.includes('impressions') && (
                     <Bar
-                      yAxisId="right"
+                      yAxisId={showRightYAxis ? "right" : "left"}
                       dataKey="impressions"
                       name="Impressions"
                       fill={chartConfig.impressions.color}
@@ -348,20 +401,23 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
               ) : chartType === "line" ? (
                 <LineChart
                   data={chartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+                  margin={chartMargin}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis
                     dataKey="name"
-                    angle={-45}
+                    angle={xAxisAngle}
                     textAnchor="end"
                     height={80}
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: isMobile ? 10 : 12 }}
                     tickLine={{ stroke: "#e0e0e0" }}
+                    interval={0}
                   />
                   <YAxis 
                     tickFormatter={formatNumber} 
                     tickLine={{ stroke: "#e0e0e0" }}
+                    width={isMobile ? 40 : 60}
+                    fontSize={isMobile ? 10 : 12}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend content={<CustomLegend />} />
@@ -371,9 +427,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="spends"
                       name="Spend ($)"
                       stroke={chartConfig.spends.color}
-                      strokeWidth={3}
-                      dot={{ r: 5, strokeWidth: 2, fill: "white", stroke: chartConfig.spends.color }}
-                      activeDot={{ r: 8, strokeWidth: 2 }}
+                      strokeWidth={isMobile ? 2 : 3}
+                      dot={{ r: isMobile ? 3 : 5, strokeWidth: isMobile ? 1 : 2, fill: "white", stroke: chartConfig.spends.color }}
+                      activeDot={{ r: isMobile ? 5 : 8, strokeWidth: isMobile ? 1 : 2 }}
                       animationDuration={1000}
                     />
                   )}
@@ -383,9 +439,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="impressions"
                       name="Impressions"
                       stroke={chartConfig.impressions.color}
-                      strokeWidth={3}
-                      dot={{ r: 5, strokeWidth: 2, fill: "white", stroke: chartConfig.impressions.color }}
-                      activeDot={{ r: 8, strokeWidth: 2 }}
+                      strokeWidth={isMobile ? 2 : 3}
+                      dot={{ r: isMobile ? 3 : 5, strokeWidth: isMobile ? 1 : 2, fill: "white", stroke: chartConfig.impressions.color }}
+                      activeDot={{ r: isMobile ? 5 : 8, strokeWidth: isMobile ? 1 : 2 }}
                       animationDuration={1200}
                     />
                   )}
@@ -395,9 +451,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="clicks"
                       name="Clicks"
                       stroke={chartConfig.clicks.color}
-                      strokeWidth={3}
-                      dot={{ r: 5, strokeWidth: 2, fill: "white", stroke: chartConfig.clicks.color }}
-                      activeDot={{ r: 8, strokeWidth: 2 }}
+                      strokeWidth={isMobile ? 2 : 3}
+                      dot={{ r: isMobile ? 3 : 5, strokeWidth: isMobile ? 1 : 2, fill: "white", stroke: chartConfig.clicks.color }}
+                      activeDot={{ r: isMobile ? 5 : 8, strokeWidth: isMobile ? 1 : 2 }}
                       animationDuration={1400}
                     />
                   )}
@@ -407,9 +463,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="installs"
                       name="Installs"
                       stroke={chartConfig.installs.color}
-                      strokeWidth={3}
-                      dot={{ r: 5, strokeWidth: 2, fill: "white", stroke: chartConfig.installs.color }}
-                      activeDot={{ r: 8, strokeWidth: 2 }}
+                      strokeWidth={isMobile ? 2 : 3}
+                      dot={{ r: isMobile ? 3 : 5, strokeWidth: isMobile ? 1 : 2, fill: "white", stroke: chartConfig.installs.color }}
+                      activeDot={{ r: isMobile ? 5 : 8, strokeWidth: isMobile ? 1 : 2 }}
                       animationDuration={1600}
                     />
                   )}
@@ -417,20 +473,23 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
               ) : chartType === "area" ? (
                 <AreaChart
                   data={chartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+                  margin={chartMargin}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis
                     dataKey="name"
-                    angle={-45}
+                    angle={xAxisAngle}
                     textAnchor="end"
                     height={80}
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: isMobile ? 10 : 12 }}
                     tickLine={{ stroke: "#e0e0e0" }}
+                    interval={0}
                   />
                   <YAxis 
                     tickFormatter={formatNumber} 
                     tickLine={{ stroke: "#e0e0e0" }}
+                    width={isMobile ? 40 : 60}
+                    fontSize={isMobile ? 10 : 12}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend content={<CustomLegend />} />
@@ -441,8 +500,8 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       name="Spend ($)"
                       stroke={chartConfig.spends.color}
                       fill={`${chartConfig.spends.color}30`}
-                      strokeWidth={3}
-                      activeDot={{ r: 8, strokeWidth: 2 }}
+                      strokeWidth={isMobile ? 2 : 3}
+                      activeDot={{ r: isMobile ? 5 : 8, strokeWidth: isMobile ? 1 : 2 }}
                       animationDuration={1000}
                     />
                   )}
@@ -453,8 +512,8 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       name="Impressions"
                       stroke={chartConfig.impressions.color}
                       fill={`${chartConfig.impressions.color}30`}
-                      strokeWidth={3}
-                      activeDot={{ r: 8, strokeWidth: 2 }}
+                      strokeWidth={isMobile ? 2 : 3}
+                      activeDot={{ r: isMobile ? 5 : 8, strokeWidth: isMobile ? 1 : 2 }}
                       animationDuration={1200}
                     />
                   )}
@@ -465,8 +524,8 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       name="Clicks"
                       stroke={chartConfig.clicks.color}
                       fill={`${chartConfig.clicks.color}30`}
-                      strokeWidth={3}
-                      activeDot={{ r: 8, strokeWidth: 2 }}
+                      strokeWidth={isMobile ? 2 : 3}
+                      activeDot={{ r: isMobile ? 5 : 8, strokeWidth: isMobile ? 1 : 2 }}
                       animationDuration={1400}
                     />
                   )}
@@ -477,8 +536,8 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       name="Installs"
                       stroke={chartConfig.installs.color}
                       fill={`${chartConfig.installs.color}30`}
-                      strokeWidth={3}
-                      activeDot={{ r: 8, strokeWidth: 2 }}
+                      strokeWidth={isMobile ? 2 : 3}
+                      activeDot={{ r: isMobile ? 5 : 8, strokeWidth: isMobile ? 1 : 2 }}
                       animationDuration={1600}
                     />
                   )}
@@ -486,28 +545,35 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
               ) : (
                 <ComposedChart
                   data={chartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+                  margin={chartMargin}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis
                     dataKey="name"
-                    angle={-45}
+                    angle={xAxisAngle}
                     textAnchor="end"
                     height={80}
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: isMobile ? 10 : 12 }}
                     tickLine={{ stroke: "#e0e0e0" }}
+                    interval={0}
                   />
                   <YAxis 
                     yAxisId="left" 
                     tickFormatter={formatNumber}
                     tickLine={{ stroke: "#e0e0e0" }}
+                    width={isMobile ? 40 : 60}
+                    fontSize={isMobile ? 10 : 12}
                   />
-                  <YAxis 
-                    yAxisId="right" 
-                    orientation="right" 
-                    tickFormatter={formatNumber}
-                    tickLine={{ stroke: "#e0e0e0" }}
-                  />
+                  {showRightYAxis && (
+                    <YAxis 
+                      yAxisId="right" 
+                      orientation="right" 
+                      tickFormatter={formatNumber}
+                      tickLine={{ stroke: "#e0e0e0" }}
+                      width={isMobile ? 40 : 60}
+                      fontSize={isMobile ? 10 : 12}
+                    />
+                  )}
                   <Tooltip content={<CustomTooltip />} />
                   <Legend content={<CustomLegend />} />
                   {activeMetrics.includes('spends') && (
@@ -517,20 +583,20 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       name="Spend ($)"
                       fill={chartConfig.spends.color}
                       radius={[6, 6, 0, 0]}
-                      barSize={25}
+                      barSize={isMobile ? 15 : 25}
                       animationDuration={1000}
                     />
                   )}
                   {activeMetrics.includes('impressions') && (
                     <Line
-                      yAxisId="right"
+                      yAxisId={showRightYAxis ? "right" : "left"}
                       type="monotone"
                       dataKey="impressions"
                       name="Impressions"
                       stroke={chartConfig.impressions.color}
-                      strokeWidth={3}
-                      dot={{ r: 5, strokeWidth: 2, fill: "white", stroke: chartConfig.impressions.color }}
-                      activeDot={{ r: 8, strokeWidth: 2 }}
+                      strokeWidth={isMobile ? 2 : 3}
+                      dot={{ r: isMobile ? 3 : 5, strokeWidth: isMobile ? 1 : 2, fill: "white", stroke: chartConfig.impressions.color }}
+                      activeDot={{ r: isMobile ? 5 : 8, strokeWidth: isMobile ? 1 : 2 }}
                       animationDuration={1200}
                     />
                   )}
@@ -541,9 +607,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       dataKey="clicks"
                       name="Clicks"
                       stroke={chartConfig.clicks.color}
-                      strokeWidth={3}
-                      dot={{ r: 5, strokeWidth: 2, fill: "white", stroke: chartConfig.clicks.color }}
-                      activeDot={{ r: 8, strokeWidth: 2 }}
+                      strokeWidth={isMobile ? 2 : 3}
+                      dot={{ r: isMobile ? 3 : 5, strokeWidth: isMobile ? 1 : 2, fill: "white", stroke: chartConfig.clicks.color }}
+                      activeDot={{ r: isMobile ? 5 : 8, strokeWidth: isMobile ? 1 : 2 }}
                       animationDuration={1400}
                     />
                   )}
@@ -555,8 +621,8 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
                       name="Installs"
                       stroke={chartConfig.installs.color}
                       fill={`${chartConfig.installs.color}20`}
-                      strokeWidth={3}
-                      activeDot={{ r: 8, strokeWidth: 2 }}
+                      strokeWidth={isMobile ? 2 : 3}
+                      activeDot={{ r: isMobile ? 5 : 8, strokeWidth: isMobile ? 1 : 2 }}
                       animationDuration={1600}
                     />
                   )}
@@ -568,11 +634,21 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
         
         {isFullscreen && (
           <div className="absolute bottom-4 right-4">
-            <Button onClick={toggleFullscreen} className="bg-white text-gray-800 hover:bg-gray-100 shadow-lg">
+            <Button onClick={toggleFullscreen} className="bg-white text-gray-800 hover:bg-gray-100 shadow-lg text-xs sm:text-sm p-2 sm:p-4">
               Exit Fullscreen
             </Button>
           </div>
         )}
+        
+        
+{isMobile && data.length > 6 && (
+  <div className="mt-4 text-center">
+    <p className="text-xs text-gray-500">
+      Showing {chartData.length} of {data.length} items. 
+      {!isFullscreen && <span> Tap fullscreen for complete view.</span>}
+    </p>
+  </div>
+)}
       </CardContent>
     </Card>
   );

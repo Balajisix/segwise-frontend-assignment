@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Papa from "papaparse";
-import { FilterBar, FilterItem } from "../components/FilterBar";
+import {FilterBar} from "../components/FilterBar";
+import { FilterItem } from "../components/FilterBar";
 import DataTable from "../components/DataTable";
 import ChartView from "../components/ChartView";
 import Footer from "../components/Footer";
