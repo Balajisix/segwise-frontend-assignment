@@ -7,14 +7,16 @@ import ChartView from "../components/ChartView";
 import Footer from "../components/Footer";
 import logo from "../assets/segwise-logo.png";
 import csvText from "../data/creatives.csv?raw";
-import { BarChart2, Table as TableIcon } from "lucide-react";
-import { Link } from "react-router-dom";
+import { BarChart2, Table as TableIcon, ExternalLink } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
 export interface CreativeRow {
   [key: string]: string | number;
+  id: number; // Added id field for row identification
 }
 
 const Home: React.FC = () => {
+  const navigate = useNavigate();
   const [tableData, setTableData] = useState<CreativeRow[]>([]);
   const [filteredData, setFilteredData] = useState<CreativeRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,7 +24,7 @@ const Home: React.FC = () => {
   const [previewRow, setPreviewRow] = useState<CreativeRow | null>(null);
   const [activeFilters, setActiveFilters] = useState<FilterItem[]>([]); void(activeFilters);
   const [viewMode, setViewMode] = useState<"summary" | "table">("summary");
-
+  
   // Reload on 'R'
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -43,8 +45,8 @@ const Home: React.FC = () => {
         dynamicTyping: true,
         transformHeader: (h) => h.trim(),
       });
-      const data = res.data.map((row) => {
-        const cleaned: any = {};
+      const data = res.data.map((row, index) => {
+        const cleaned: any = { id: index }; // Add an ID for each row
         Object.entries(row).forEach(([k, v]) => {
           cleaned[k.trim()] = typeof v === "string" ? v.trim() : v;
         });
@@ -106,6 +108,13 @@ const Home: React.FC = () => {
     );
 
     setFilteredData(result);
+  };
+
+  // Handle navigation to row detail page
+  const handleViewRowDetail = (row: CreativeRow) => {
+    if (row.id !== undefined) {
+      navigate(`/row/${row.id}`);
+    }
   };
 
   return (
@@ -193,6 +202,15 @@ const Home: React.FC = () => {
               </div>
             ))}
           </div>
+          
+          {/* View Full Details Button */}
+          <button 
+            onClick={() => handleViewRowDetail(previewRow)}
+            className="w-full mt-4 py-2 bg-blue-500 text-white rounded-md flex items-center justify-center hover:bg-blue-600 transition-colors"
+          >
+            <span>View Full Details</span>
+            <ExternalLink className="ml-2 w-4 h-4" />
+          </button>
         </div>
       )}
 

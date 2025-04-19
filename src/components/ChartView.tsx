@@ -215,25 +215,25 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
           
           <div className="flex flex-wrap gap-2">
             <ToggleGroup type="single" value={chartType} onValueChange={(val) => val && setChartType(val as any)} className="bg-gray-50 p-1 rounded-md">
-              <ToggleGroupItem value="bar" aria-label="Bar Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600">
+              <ToggleGroupItem value="bar" aria-label="Bar Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600 cursor-pointer">
                 <BarChart3 className="h-4 w-4" />
               </ToggleGroupItem>
-              <ToggleGroupItem value="line" aria-label="Line Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600">
+              <ToggleGroupItem value="line" aria-label="Line Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600 cursor-pointer">
                 <LineChartIcon className="h-4 w-4" />
               </ToggleGroupItem>
-              <ToggleGroupItem value="area" aria-label="Area Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600">
+              <ToggleGroupItem value="area" aria-label="Area Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600 cursor-pointer">
                 <AreaChartIcon className="h-4 w-4" />
               </ToggleGroupItem>
-              <ToggleGroupItem value="composed" aria-label="Composed Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600">
+              <ToggleGroupItem value="composed" aria-label="Composed Chart" className="data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600 cursor-pointer">
                 <LayoutGrid className="h-4 w-4" />
               </ToggleGroupItem>
             </ToggleGroup>
             
-            <Button variant="outline" size="icon" onClick={handleDownload} className="hover:bg-gray-50">
+            <Button variant="outline" size="icon" onClick={handleDownload} className="hover:bg-gray-50 cursor-pointer">
               <Download className="h-4 w-4" />
             </Button>
             
-            <Button variant="outline" size="icon" onClick={toggleFullscreen} className="hover:bg-gray-50">
+            <Button variant="outline" size="icon" onClick={toggleFullscreen} className="hover:bg-gray-50 cursor-pointer">
               <Maximize2 className="h-4 w-4" />
             </Button>
           </div>
