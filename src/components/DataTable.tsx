@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, X, ArrowUpDown, ChevronLeft, ChevronRight, Filter, Download } from "lucide-react";
+import { Search, X, ArrowUpDown, ChevronLeft, ChevronRight, Filter, Download, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,12 +13,19 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface DataTableProps<Row> {
   data: Row[];
   onRowClick?: (row: Row) => void;
   title?: string;
   description?: string;
+  previewAvailable?: boolean;
 }
 
 const DataTable = <Row extends Record<string, any>>({
@@ -35,6 +42,9 @@ const DataTable = <Row extends Record<string, any>>({
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  
+  // Track hover state for rows
+  const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
 
   // Derive columns from data
   const columns = useMemo(() => {
@@ -165,11 +175,36 @@ const DataTable = <Row extends Record<string, any>>({
 
   const responsiveVisibleColumns = useMemo(getResponsiveVisibleColumns, [visibleColumns]);
 
+  // Helper to display tooltip text
+  const getTooltipText = () => {
+    if (!onRowClick) return null;
+    return "Click to view details";
+  };
+
   return (
     <Card className="w-full shadow-lg border-opacity-50 overflow-hidden">
       <CardHeader className="pb-3 bg-gray-50 dark:bg-gray-900">
         <div className="flex flex-col space-y-1.5">
-          <CardTitle className="text-xl font-bold">{title}</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-xl font-bold">{title}</CardTitle>
+            
+            {/* Shows tooltip in the row */}
+            {onRowClick && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="secondary" className="cursor-help">
+                      <Eye className="mr-1 h-3 w-3" />
+                      Preview Available
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="bg-black text-white p-2 rounded shadow-lg z-50">
+                    <p>Click to view the preview</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           {description && <CardDescription>{description}</CardDescription>}
         </div>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4">
@@ -235,84 +270,112 @@ const DataTable = <Row extends Record<string, any>>({
       <CardContent className="p-0">
         <div className="border-t">
           <div className="relative w-full overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800">
-                  {columns
-                    .filter((col) => responsiveVisibleColumns.includes(col))
-                    .map((col) => (
-                      <TableHead key={col} className="whitespace-nowrap font-medium">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2 py-1 font-semibold"
-                          onClick={() => requestSort(col)}
-                        >
-                          <span>{formatColumnName(col)}</span>
-                          <ArrowUpDown className="ml-1 h-3 w-3 opacity-70" />
-                          {sortConfig?.key === col && (
-                            <Badge variant="secondary" className="ml-1 px-1 py-0 text-xs">
-                              {sortConfig.direction === "asc" ? "↑" : "↓"}
-                            </Badge>
-                          )}
-                        </Button>
-                      </TableHead>
-                    ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedData.length > 0 ? (
-                  paginatedData.map((row, idx) => (
-                    <TableRow
-                      key={idx}
-                      onClick={() => onRowClick?.(row)}
-                      className={`${
-                        idx % 2 === 0 ? "bg-white dark:bg-gray-950" : "bg-gray-50 dark:bg-gray-900/50"
-                      } ${onRowClick ? "cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20" : ""}`}
-                    >
-                      {columns
-                        .filter((col) => responsiveVisibleColumns.includes(col))
-                        .map((col) => {
-                          const cellValue = row[col] ?? '';
-                          let displayValue = cellValue;
-                          
-                          if (typeof cellValue === 'boolean') {
-                            displayValue = cellValue ? 'Yes' : 'No';
-                          } else if (cellValue instanceof Date) {
-                            displayValue = cellValue.toLocaleDateString();
-                          }
-                          
-                          return (
-                            <TableCell key={col} className="py-3">
-                              {displayValue}
-                            </TableCell>
-                          );
-                        })}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={responsiveVisibleColumns.length}
-                      className="h-32 text-center"
-                    >
-                      <div className="flex flex-col items-center justify-center text-muted-foreground">
-                        <p>No results found</p>
-                        {search && (
-                          <Button 
-                            variant="link" 
-                            onClick={clearSearch} 
-                            className="mt-2"
+            <TooltipProvider>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800">
+                    {columns
+                      .filter((col) => responsiveVisibleColumns.includes(col))
+                      .map((col) => (
+                        <TableHead key={col} className="whitespace-nowrap font-medium">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2 py-1 font-semibold"
+                            onClick={() => requestSort(col)}
                           >
-                            Clear search
+                            <span>{formatColumnName(col)}</span>
+                            <ArrowUpDown className="ml-1 h-3 w-3 opacity-70" />
+                            {sortConfig?.key === col && (
+                              <Badge variant="secondary" className="ml-1 px-1 py-0 text-xs">
+                                {sortConfig.direction === "asc" ? "↑" : "↓"}
+                              </Badge>
+                            )}
                           </Button>
-                        )}
-                      </div>
-                    </TableCell>
+                        </TableHead>
+                      ))}
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedData.length > 0 ? (
+                    paginatedData.map((row, idx) => {
+                      const tooltipText = getTooltipText();
+                      
+                      return (
+                        <Tooltip key={idx} open={hoveredRowIndex === idx && !!tooltipText}>
+                          <TooltipTrigger asChild>
+                            <TableRow
+                              onClick={() => onRowClick?.(row)}
+                              onMouseEnter={() => setHoveredRowIndex(idx)}
+                              onMouseLeave={() => setHoveredRowIndex(null)}
+                              className={`
+                                ${idx % 2 === 0 ? "bg-white dark:bg-gray-950" : "bg-gray-50 dark:bg-gray-900/50"}
+                                ${onRowClick ? "cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20" : ""}
+                                ${onRowClick ? "relative" : ""}
+                              `}
+                            >
+                              {columns
+                                .filter((col) => responsiveVisibleColumns.includes(col))
+                                .map((col) => {
+                                  const cellValue = row[col] ?? '';
+                                  let displayValue = cellValue;
+                                  
+                                  if (typeof cellValue === 'boolean') {
+                                    displayValue = cellValue ? 'Yes' : 'No';
+                                  } else if (cellValue instanceof Date) {
+                                    displayValue = cellValue.toLocaleDateString();
+                                  }
+                                  
+                                  return (
+                                    <TableCell key={col} className="py-3">
+                                      {displayValue}
+                                    </TableCell>
+                                  );
+                                })}
+                              
+                              {/* Visual indicator for clickable rows */}
+                              {onRowClick && hoveredRowIndex === idx && (
+                                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-100 dark:bg-blue-900 p-1 rounded-full">
+                                  <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                </div>
+                              )}
+                            </TableRow>
+                          </TooltipTrigger>
+                          {tooltipText && (
+                            <TooltipContent 
+                              side="top" 
+                              className="bg-black text-white p-2 rounded shadow-lg z-50"
+                            >
+                              <p>{tooltipText}</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        colSpan={responsiveVisibleColumns.length}
+                        className="h-32 text-center"
+                      >
+                        <div className="flex flex-col items-center justify-center text-muted-foreground">
+                          <p>No results found</p>
+                          {search && (
+                            <Button 
+                              variant="link" 
+                              onClick={clearSearch} 
+                              className="mt-2"
+                            >
+                              Clear search
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TooltipProvider>
           </div>
         </div>
 

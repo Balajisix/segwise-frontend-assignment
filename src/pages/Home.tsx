@@ -204,7 +204,7 @@ const Home: React.FC = () => {
                     ? `Showing all ${tableData.length} rows`
                     : `Showing ${filteredData.length} of ${tableData.length} rows`}
                 </div>
-                <DataTable data={filteredData} onRowClick={setPreviewRow} />
+                <DataTable data={filteredData} onRowClick={setPreviewRow} previewAvailable={true}  />
               </>
             ) : (
               <ChartView

@@ -7,6 +7,8 @@
 - 🔍 **Search & Filter**: Quickly search, sort, and apply multiple filters to your data.
 - 📊 **Interactive Charts**: Visualize spends, impressions, clicks, and installs with dynamic graphs.
 - ⚡ **Fast CSV Parsing**: Leverages [PapaParse](https://www.papaparse.com/) for lightning-fast data retrieval from CSV.
+- - 👀 **Row Preview Available**: Instantly view detailed data for any row with a single click.
+- 📄 **Pagination Implemented**: Seamlessly navigate large datasets with efficient pagination.
 
 ## 🛠 Technologies Used
 
