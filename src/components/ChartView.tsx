@@ -162,13 +162,22 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
     }
   };
 
-  // Toggle metrics selection
+  // Toggle metrics selection functions, allows user to filter the data in the charts
   const toggleMetric = (value: string) => {
     setActiveMetrics(prev => {
-      if (prev.includes(value)) {
-        // Keep one metric active by default
-        return prev.length > 1 ? prev.filter(m => m !== value) : prev;
-      } else {
+      if (prev.length === Object.keys(chartConfig).length) {
+        return [value];
+      }
+
+      else if (prev.length === 1 && prev.includes(value)) {
+        return Object.keys(chartConfig);
+      }
+
+      else if (prev.includes(value)) {
+        return prev;
+      }
+
+      else {
         return [...prev, value];
       }
     });
@@ -209,15 +218,22 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
         {payload.map((entry: any, index: number) => (
           <div 
             key={index} 
-            className="flex items-center gap-1 sm:gap-2 cursor-pointer hover:bg-gray-50 py-1 px-2 rounded-full transition-colors"
+            className={`flex items-center gap-1 sm:gap-2 cursor-pointer py-1 px-2 rounded-full transition-colors
+              ${activeMetrics.includes(entry.dataKey) 
+                ? 'bg-blue-50 border border-blue-100' 
+                : 'bg-gray-50 border border-gray-100 opacity-60'}`}
             onClick={() => toggleMetric(entry.dataKey)}
           >
             <div 
-              className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full ${!activeMetrics.includes(entry.dataKey) ? 'opacity-30' : ''}`} 
+              className="w-3 h-3 sm:w-4 sm:h-4 rounded-full" 
               style={{ backgroundColor: entry.color }}
             />
-            <span className={`text-xs sm:text-sm font-medium ${!activeMetrics.includes(entry.dataKey) ? 'text-gray-400' : 'text-gray-700'}`}>
+            <span className={`text-xs sm:text-sm font-medium ${activeMetrics.includes(entry.dataKey) ? 'text-gray-700' : 'text-gray-400'}`}>
               {entry.value}
+            </span>
+            {/* Optional: Add a visual indicator that this is toggleable */}
+            <span className="text-xs text-gray-400 ml-1">
+              {activeMetrics.includes(entry.dataKey) ? "✓" : ""}
             </span>
           </div>
         ))}
@@ -314,7 +330,10 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
       </CardHeader>
       
       <CardContent className="px-2 sm:px-6">
-        <ChartContainer config={chartConfig} className={`w-full ${isFullscreen ? 'h-full' : 'min-h-[300px] sm:min-h-[400px]'}`}>
+        <div className="flex justify-center mb-2">
+          <span className="text-sm text-gray-500 italic">Click metric names to filter chart display</span>
+        </div>
+        <ChartContainer config={chartConfig} className={`w-full ${isFullscreen ? 'h-full' : 'min-h-[300px] sm:min-h-[400px]'}`}> 
           <div className="w-full" style={{ height: chartHeight }}>
             <ResponsiveContainer width="100%" height="100%">
               {chartType === "bar" ? (

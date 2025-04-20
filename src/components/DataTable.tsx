@@ -179,7 +179,7 @@ const DataTable = <Row extends Record<string, any>>({
             </Badge>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 gap-1">
+                <Button variant="outline" size="sm" className="h-8 gap-1 cursor-pointer">
                   <Filter className="h-4 w-4" />
                   <span className="hidden sm:inline">Columns</span>
                 </Button>
@@ -201,7 +201,7 @@ const DataTable = <Row extends Record<string, any>>({
             <Button 
               variant="outline" 
               size="sm" 
-              className="h-8 gap-1" 
+              className="h-8 gap-1 cursor-pointer" 
               onClick={exportToCSV}
             >
               <Download className="h-4 w-4" />

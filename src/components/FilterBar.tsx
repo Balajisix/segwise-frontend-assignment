@@ -40,9 +40,9 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange, onFilterOpenChange
 
   const [searchVal, setSearchVal] = useState("");
   const [operator, setOperator] = useState<string>("");
-  const [radioVal, setRadioVal] = useState(""); // For tags (single selection)
-  const [multiVals, setMultiVals] = useState<string[]>([]); // For dimensions (multi-select)
-  const [textVal, setTextVal] = useState(""); // For dimensions (contains/does not contain)
+  const [radioVal, setRadioVal] = useState(""); // For tags
+  const [multiVals, setMultiVals] = useState<string[]>([]); // For dimensions
+  const [textVal, setTextVal] = useState(""); // For dimensions
   const [numVal, setNumVal] = useState(""); // For metrics
   const [valueOptions, setValueOptions] = useState<string[]>([]);
 
@@ -192,7 +192,7 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange, onFilterOpenChange
             {/* Header */}
             <div className="sticky top-0 z-10 border-b px-3 py-2 sm:px-4 bg-white flex justify-between items-center">
               <button
-                className="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1 bg-green-50 border border-green-200 rounded-full text-green-700 font-medium text-xs sm:text-sm hover:bg-green-100"
+                className="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1 bg-green-50 border border-green-200 rounded-full text-green-700 font-medium text-xs sm:text-sm hover:bg-green-100 cursor-pointer"
                 onClick={applyFilters}
               >
                 <span className="mr-1 font-bold text-lg">+</span>
@@ -230,7 +230,7 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange, onFilterOpenChange
                       onClick={() => setPending((p) => p.filter((_, idx) => idx !== i))}
                       className="flex-shrink-0"
                     >
-                      <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 hover:text-red-600" />
+                      <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 hover:text-red-600 cursor-pointer" />
                     </button>
                   </div>
                 ))}
@@ -258,7 +258,7 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange, onFilterOpenChange
             {/* Category Selection */}
             {step === 1 && (
               <>
-                <div className="grid grid-cols-3 text-center border-b cursor-pointer">
+                <div className="grid grid-cols-3 text-center border-b">
                   {(["Dimensions", "Tags", "Metrics"] as Tab[]).map((t) => (
                     <button
                       key={t}
