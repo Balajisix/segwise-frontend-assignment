@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Search as SearchIcon,
   Trash2,
+  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -19,9 +20,10 @@ export interface FilterItem {
 }
 interface Props {
   onFiltersChange: (filters: FilterItem[], logic: "AND" | "OR") => void;
+  onFilterOpenChange?: (isOpen: boolean) => void; // New prop
 }
 
-export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
+export const FilterBar: React.FC<Props> = ({ onFiltersChange, onFilterOpenChange }) => {
   // These are states for UI
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
@@ -43,6 +45,12 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
   const [textVal, setTextVal] = useState(""); // For dimensions (contains/does not contain)
   const [numVal, setNumVal] = useState(""); // For metrics
   const [valueOptions, setValueOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (onFilterOpenChange) {
+      onFilterOpenChange(open);
+    }
+  }, [open, onFilterOpenChange]);
 
   // Operators
   const availableOperators = useMemo(() => {
@@ -137,87 +145,115 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
     setSelectedCol(null);
   };
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (open && !target.closest('.filter-dropdown') && !target.closest('.filter-trigger')) {
+        setOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [open]);
+
+  // Apply filters and close
+  const applyFilters = () => {
+    onFiltersChange(pending, logic);
+    setOpen(false);
+  };
+
   return (
-    <div className="w-full max-w-screen-xl mx-auto bg-gray-100 rounded-xl p-4">
+    <div className="w-full max-w-screen-xl mx-auto bg-gray-100 rounded-lg p-3 sm:p-4 relative">
       {/* Trigger Button */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow hover:bg-lime-50 cursor-pointer"
+        className="filter-trigger flex items-center gap-2 bg-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg shadow hover:bg-lime-50 cursor-pointer text-sm sm:text-base"
       >
         <Funnel className="w-4 h-4" />
-        Filters
+        <span>Filters</span>
         <Badge className="bg-lime-300">{String(pending.length).padStart(2, "0")}</Badge>
         <ChevronDown className="w-4 h-4" />
       </button>
 
       {open && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop for mobile */}
           <div
-            className="fixed inset-0 bg-black bg-opacity-20"
+            className="fixed inset-0 bg-black bg-opacity-20 z-10 md:hidden"
             onClick={() => setOpen(false)}
           />
 
           {/* Panel */}
-          <div className="absolute z-20 mt-2 w-full sm:w-80 bg-white rounded-xl shadow-lg border">
+          <div className="filter-dropdown absolute z-20 mt-2 w-[calc(100%-2rem)] left-4 right-4 sm:w-96 md:w-80 bg-white rounded-xl shadow-lg border max-h-[80vh] overflow-auto">
             {/* Header */}
-            <div className="border-b px-4 py-2">
+            <div className="sticky top-0 z-10 border-b px-3 py-2 sm:px-4 bg-white flex justify-between items-center">
               <button
-                className="
-                  inline-flex items-center 
-                  px-3 py-1 
-                  bg-green-50 border border-green-200 
-                  rounded-full 
-                  text-green-700 font-medium text-sm 
-                  hover:bg-green-100
-                "
-                onClick={() => {
-                  onFiltersChange(pending, logic);
-                  setOpen(false);
-                }}
+                className="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1 bg-green-50 border border-green-200 rounded-full text-green-700 font-medium text-xs sm:text-sm hover:bg-green-100"
+                onClick={applyFilters}
               >
                 <span className="mr-1 font-bold text-lg">+</span>
                 Add Filter
               </button>
+              
+              <button 
+                className="p-1 hover:bg-gray-100 rounded-full"
+                onClick={() => setOpen(false)}
+              >
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
             </div>
 
             {/* Pending Filters */}
-            <div className="p-3 space-y-2">
-              {pending.map((f, i) => (
-                <div
-                  key={i}
-                  className="flex justify-between items-center bg-green-50 px-3 py-2 rounded"
-                >
-                  <div className="text-sm">
-                    <strong>{f.category.name}</strong> {f.operator}{" "}
-                    <em>{Array.isArray(f.value) ? f.value.join(", ") : f.value}</em>
-                  </div>
-                  <button
-                    onClick={() => setPending((p) => p.filter((_, idx) => idx !== i))}
+            {pending.length > 0 && (
+              <div className="p-3 space-y-2 border-b">
+                {pending.map((f, i) => (
+                  <div
+                    key={i}
+                    className="flex justify-between items-center bg-green-50 px-2 py-1.5 sm:px-3 sm:py-2 rounded text-xs sm:text-sm"
                   >
-                    <Trash2 className="w-4 h-4 text-gray-500 hover:text-red-600" />
-                  </button>
-                </div>
-              ))}
-
-              {pending.length > 1 && (
-                <div className="flex justify-center gap-2">
-                  {(["AND", "OR"] as const).map((L) => (
+                    <div className="flex-1 mr-2 truncate">
+                      <strong className="truncate inline-block max-w-full">{f.category.name}</strong>{" "}
+                      <span className="whitespace-nowrap">{f.operator}{" "}</span>
+                      <em className="truncate inline-block max-w-full">
+                        {Array.isArray(f.value) ? 
+                          (f.value.length > 2 ? 
+                            `${f.value[0]}, ${f.value[1]}, +${f.value.length - 2} more` : 
+                            f.value.join(", ")) : 
+                          f.value}
+                      </em>
+                    </div>
                     <button
-                      key={L}
-                      onClick={() => setLogic(L)}
-                      className={`px-3 py-1 text-xs rounded ${
-                        logic === L
-                          ? "bg-gray-200 text-gray-800 font-semibold"
-                          : "text-gray-500 hover:bg-gray-50"
-                      }`}
+                      onClick={() => setPending((p) => p.filter((_, idx) => idx !== i))}
+                      className="flex-shrink-0"
                     >
-                      {L}
+                      <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 hover:text-red-600" />
                     </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                  </div>
+                ))}
+
+                {pending.length > 1 && (
+                  <div className="flex justify-center gap-2">
+                    {(["AND", "OR"] as const).map((L) => (
+                      <button
+                        key={L}
+                        onClick={() => setLogic(L)}
+                        className={`px-3 py-1 text-xs rounded ${
+                          logic === L
+                            ? "bg-gray-200 text-gray-800 font-semibold"
+                            : "text-gray-500 hover:bg-gray-50"
+                        }`}
+                      >
+                        {L}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Category Selection */}
             {step === 1 && (
@@ -230,7 +266,7 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
                         setActiveTab(t);
                         setSearchCol("");
                       }}
-                      className={`py-2 text-sm ${
+                      className={`py-2 text-xs sm:text-sm ${
                         activeTab === t
                           ? "font-semibold border-b-2 border-green-500 text-gray-800"
                           : "text-gray-500 hover:bg-gray-50"
@@ -250,20 +286,26 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
                       onChange={(e) => setSearchCol(e.target.value)}
                     />
                   </div>
-                  <ul className="max-h-40 overflow-auto space-y-1">
-                    {filteredCols.map((c) => (
-                      <li
-                        key={c.name}
-                        onClick={() => {
-                          setSelectedCol(c);
-                          setStep(2);
-                        }}
-                        className="flex justify-between px-3 py-2 hover:bg-green-50 rounded cursor-pointer text-sm"
-                      >
-                        {c.name}
-                        <ChevronDown className="w-4 h-4 text-gray-400 rotate-270" />
+                  <ul className="max-h-40 sm:max-h-60 overflow-auto space-y-1">
+                    {filteredCols.length > 0 ? (
+                      filteredCols.map((c) => (
+                        <li
+                          key={c.name}
+                          onClick={() => {
+                            setSelectedCol(c);
+                            setStep(2);
+                          }}
+                          className="flex justify-between px-3 py-2 hover:bg-green-50 rounded cursor-pointer text-xs sm:text-sm"
+                        >
+                          <span className="truncate mr-2">{c.name}</span>
+                          <ChevronDown className="w-4 h-4 text-gray-400 rotate-270 flex-shrink-0" />
+                        </li>
+                      ))
+                    ) : (
+                      <li className="px-3 py-4 text-center text-gray-500 text-xs sm:text-sm">
+                        No {activeTab.toLowerCase()} found
                       </li>
-                    ))}
+                    )}
                   </ul>
                 </div>
               </>
@@ -271,10 +313,10 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
 
             {/* Value Selection */}
             {step === 2 && selectedCol && (
-              <div className="p-4 space-y-4">
+              <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
                 <div className="flex justify-between items-center">
                   <button
-                    className="text-sm text-gray-500 hover:underline"
+                    className="text-xs sm:text-sm text-gray-500 hover:underline"
                     onClick={() => {
                       setStep(1);
                       setSelectedCol(null);
@@ -282,7 +324,7 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
                   >
                     ← Back
                   </button>
-                  <h4 className="text-sm font-semibold text-gray-700">
+                  <h4 className="text-xs sm:text-sm font-semibold text-gray-700 truncate max-w-[70%]">
                     {selectedCol.name}
                   </h4>
                 </div>
@@ -291,7 +333,7 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
                 <select
                   value={operator}
                   onChange={(e) => setOperator(e.target.value)}
-                  className="w-full border rounded px-3 py-1.5 text-sm focus:bg-yellow-50"
+                  className="w-full border rounded px-3 py-1.5 text-xs sm:text-sm focus:bg-yellow-50"
                 >
                   {availableOperators.map((op) => (
                     <option key={op} value={op}>
@@ -306,32 +348,40 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
                     <div className="relative">
                       <SearchIcon className="absolute left-2 top-2 w-4 h-4 text-gray-400" />
                       <input
-                        className="w-full pl-8 pr-3 py-1.5 border rounded text-sm focus:bg-yellow-50"
+                        className="w-full pl-8 pr-3 py-1.5 border rounded text-xs sm:text-sm focus:bg-yellow-50"
                         placeholder="Search"
                         value={searchVal}
                         onChange={(e) => setSearchVal(e.target.value)}
                       />
                     </div>
-                    <div className="max-h-40 overflow-auto space-y-1 border rounded p-2">
+                    <div className="max-h-36 sm:max-h-48 overflow-auto space-y-1 border rounded p-2">
                       {valueOptions
                         .filter((v) => v.toLowerCase().includes(searchVal.toLowerCase()))
-                        .map((v) => (
-                          <label
-                            key={v}
-                            className={`flex items-center px-2 py-1 rounded cursor-pointer ${
-                              radioVal === v ? "bg-green-50 text-green-700" : "hover:bg-gray-50"
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="tagRadio"
-                              className="mr-2"
-                              checked={radioVal === v}
-                              onChange={() => setRadioVal(v)}
-                            />
-                            {v}
-                          </label>
-                        ))}
+                        .length > 0 ? (
+                          valueOptions
+                            .filter((v) => v.toLowerCase().includes(searchVal.toLowerCase()))
+                            .map((v) => (
+                              <label
+                                key={v}
+                                className={`flex items-center px-2 py-1 rounded cursor-pointer text-xs sm:text-sm ${
+                                  radioVal === v ? "bg-green-50 text-green-700" : "hover:bg-gray-50"
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="tagRadio"
+                                  className="mr-2"
+                                  checked={radioVal === v}
+                                  onChange={() => setRadioVal(v)}
+                                />
+                                <span className="truncate">{v}</span>
+                              </label>
+                            ))
+                        ) : (
+                          <div className="text-center py-3 text-gray-500 text-xs sm:text-sm">
+                            No options match your search
+                          </div>
+                        )}
                     </div>
                   </>
                 )}
@@ -343,7 +393,7 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
                       <div className="relative">
                         <SearchIcon className="absolute left-2 top-2 w-4 h-4 text-gray-400" />
                         <input
-                          className="w-full pl-8 pr-3 py-1.5 border rounded text-sm focus:bg-yellow-50"
+                          className="w-full pl-8 pr-3 py-1.5 border rounded text-xs sm:text-sm focus:bg-yellow-50"
                           placeholder="Search"
                           value={searchVal}
                           onChange={(e) => setSearchVal(e.target.value)}
@@ -357,41 +407,49 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
                             setMultiVals(e.target.checked ? valueOptions : [])
                           }
                         />
-                        <span className="text-sm">Select all</span>
+                        <span className="text-xs sm:text-sm">Select all</span>
                       </div>
-                      <div className="max-h-40 overflow-auto space-y-1 border rounded p-2">
+                      <div className="max-h-36 sm:max-h-48 overflow-auto space-y-1 border rounded p-2">
                         {valueOptions
                           .filter((v) => v.toLowerCase().includes(searchVal.toLowerCase()))
-                          .map((v) => (
-                            <label
-                              key={v}
-                              className={`flex items-center px-2 py-1 rounded cursor-pointer ${
-                                multiVals.includes(v)
-                                  ? "bg-green-50 text-green-700"
-                                  : "hover:bg-gray-50"
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                className="mr-2"
-                                checked={multiVals.includes(v)}
-                                onChange={() =>
-                                  setMultiVals((m) =>
-                                    m.includes(v)
-                                      ? m.filter((x) => x !== v)
-                                      : [...m, v]
-                                  )
-                                }
-                              />
-                              {v}
-                            </label>
-                          ))}
+                          .length > 0 ? (
+                            valueOptions
+                              .filter((v) => v.toLowerCase().includes(searchVal.toLowerCase()))
+                              .map((v) => (
+                                <label
+                                  key={v}
+                                  className={`flex items-center px-2 py-1 rounded cursor-pointer text-xs sm:text-sm ${
+                                    multiVals.includes(v)
+                                      ? "bg-green-50 text-green-700"
+                                      : "hover:bg-gray-50"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="mr-2"
+                                    checked={multiVals.includes(v)}
+                                    onChange={() =>
+                                      setMultiVals((m) =>
+                                        m.includes(v)
+                                          ? m.filter((x) => x !== v)
+                                          : [...m, v]
+                                      )
+                                    }
+                                  />
+                                  <span className="truncate">{v}</span>
+                                </label>
+                              ))
+                          ) : (
+                            <div className="text-center py-3 text-gray-500 text-xs sm:text-sm">
+                              No options match your search
+                            </div>
+                          )}
                       </div>
                     </>
                   ) : (
                     <input
                       type="text"
-                      className="w-full border rounded px-3 py-1.5 text-sm focus:bg-yellow-50"
+                      className="w-full border rounded px-3 py-1.5 text-xs sm:text-sm focus:bg-yellow-50"
                       placeholder="Enter text"
                       value={textVal}
                       onChange={(e) => setTextVal(e.target.value)}
@@ -403,7 +461,7 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
                 {selectedCol.type === "Metrics" && (
                   <input
                     type="number"
-                    className="w-full border rounded px-3 py-1.5 text-sm focus:bg-yellow-50"
+                    className="w-full border rounded px-3 py-1.5 text-xs sm:text-sm focus:bg-yellow-50"
                     placeholder="Enter value"
                     value={numVal}
                     onChange={(e) => setNumVal(e.target.value)}
@@ -422,7 +480,7 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
                       ? multiVals.length === 0
                       : textVal === ""
                   }
-                  className={`w-full py-2 rounded text-sm font-medium ${
+                  className={`w-full py-2 rounded text-xs sm:text-sm font-medium ${
                     (selectedCol.type === "Metrics"
                       ? numVal
                       : selectedCol.type === "Tags"
