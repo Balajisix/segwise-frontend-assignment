@@ -7,7 +7,7 @@ import ChartView from "../components/ChartView";
 import Footer from "../components/Footer";
 import logo from "../assets/logo.svg";
 import csvText from "../data/creatives.csv?raw";
-import { BarChart2, Table as TableIcon, ExternalLink } from "lucide-react";
+import { BarChart2, Table as TableIcon, X, Maximize2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 export interface CreativeRow {
@@ -202,35 +202,42 @@ const Home: React.FC = () => {
 
         {/* Row Preview */}
         {previewRow && (
-          <div className="fixed bottom-6 right-6 w-80 max-h-[60vh] bg-white shadow-xl border rounded-xl p-4 overflow-auto z-50">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-semibold text-gray-800">Row Preview</h3>
-              <button
-                onClick={() => setPreviewRow(null)}
-                className="text-gray-400 hover:text-red-500 text-sm"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-2 text-sm text-gray-700">
-              {Object.entries(previewRow).map(([key, value]) => (
-                <div key={key} className="flex justify-between">
-                  <span className="font-medium capitalize">
-                    {key.replace(/_/g, " ")}:
-                  </span>
-                  <span className="ml-2 text-right">{String(value)}</span>
-                </div>
-              ))}
+          <div className="fixed bottom-6 right-6 w-80 max-h-[60vh] bg-white shadow-xl border rounded-xl overflow-hidden z-50">
+            <div className="bg-gray-50 p-3 flex justify-between items-center border-b">
+              <h3 className="text-sm font-medium text-gray-800 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                Row Preview
+              </h3>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleViewRowDetail(previewRow)}
+                  className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                  title="View Full Details"
+                >
+                  <Maximize2 className="w-4 h-4 cursor-pointer" /> 
+                </button>
+                <button
+                  onClick={() => setPreviewRow(null)}
+                  className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                  title="Close Preview"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             
-            {/* View Full Details Button */}
-            <button 
-              onClick={() => handleViewRowDetail(previewRow)}
-              className="w-full mt-4 py-2 bg-blue-500 text-white rounded-md flex items-center justify-center hover:bg-blue-600 transition-colors cursor-pointer"
-            >
-              <span>View Full Details</span>
-              <ExternalLink className="ml-2 w-4 h-4" />
-            </button>
+            <div className="p-4 overflow-auto max-h-[calc(60vh-48px)]">
+              <div className="space-y-2 text-sm text-gray-700">
+                {Object.entries(previewRow).map(([key, value]) => (
+                  <div key={key} className="flex justify-between border-b border-gray-100 pb-1">
+                    <span className="font-medium capitalize text-gray-600">
+                      {key.replace(/_/g, " ")}
+                    </span>
+                    <span className="ml-2 text-right font-medium">{String(value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

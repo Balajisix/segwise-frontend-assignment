@@ -258,7 +258,7 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange, onFilterOpenChange
             {/* Category Selection */}
             {step === 1 && (
               <>
-                <div className="grid grid-cols-3 text-center border-b">
+                <div className="grid grid-cols-3 text-center border-b cursor-pointer">
                   {(["Dimensions", "Tags", "Metrics"] as Tab[]).map((t) => (
                     <button
                       key={t}
@@ -277,10 +277,11 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange, onFilterOpenChange
                   ))}
                 </div>
                 <div className="p-3 space-y-2">
-                  <div className="relative">
+                  <div className="relative w-full border rounded focus-within:ring-2 focus-within:ring-lime-400">
                     <SearchIcon className="absolute left-2 top-2 w-4 h-4 text-gray-400" />
                     <input
-                      className="w-full pl-8 pr-3 py-1.5 border rounded text-sm focus:bg-yellow-50"
+                      type="text"
+                      className="w-full pl-8 pr-3 py-1.5 bg-transparent text-sm focus:outline-none"
                       placeholder="Search"
                       value={searchCol}
                       onChange={(e) => setSearchCol(e.target.value)}
@@ -333,7 +334,7 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange, onFilterOpenChange
                 <select
                   value={operator}
                   onChange={(e) => setOperator(e.target.value)}
-                  className="w-full border rounded px-3 py-1.5 text-xs sm:text-sm focus:bg-yellow-50"
+                  className="w-full border rounded px-3 py-1.5 text-xs sm:text-sm focus:bg-lime-50"
                 >
                   {availableOperators.map((op) => (
                     <option key={op} value={op}>
@@ -390,10 +391,10 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange, onFilterOpenChange
                 {selectedCol.type === "Dimensions" && (
                   operator === "is" || operator === "is not" ? (
                     <>
-                      <div className="relative">
+                      <div className="relative w-full border rounded focus-within:ring-2 focus-within:ring-lime-400">
                         <SearchIcon className="absolute left-2 top-2 w-4 h-4 text-gray-400" />
                         <input
-                          className="w-full pl-8 pr-3 py-1.5 border rounded text-xs sm:text-sm focus:bg-yellow-50"
+                          className="w-full pl-8 pr-3 py-1.5 bg-transparent text-sm focus:outline-none"
                           placeholder="Search"
                           value={searchVal}
                           onChange={(e) => setSearchVal(e.target.value)}
@@ -447,25 +448,30 @@ export const FilterBar: React.FC<Props> = ({ onFiltersChange, onFilterOpenChange
                       </div>
                     </>
                   ) : (
-                    <input
-                      type="text"
-                      className="w-full border rounded px-3 py-1.5 text-xs sm:text-sm focus:bg-yellow-50"
-                      placeholder="Enter text"
-                      value={textVal}
-                      onChange={(e) => setTextVal(e.target.value)}
-                    />
+                    <div className="w-full border rounded focus-within:ring-2 focus-within:ring-lime-400 mt-4">
+                      <input
+                        type="text"
+                        className="w-full bg-transparent px-3 py-1.5 text-xs sm:text-sm focus:outline-none"
+                        placeholder="Enter text"
+                        value={textVal}
+                        onChange={(e) => setTextVal(e.target.value)}
+                      />
+                    </div>
                   )
                 )}
 
                 {/* Metrics */}
                 {selectedCol.type === "Metrics" && (
-                  <input
-                    type="number"
-                    className="w-full border rounded px-3 py-1.5 text-xs sm:text-sm focus:bg-yellow-50"
-                    placeholder="Enter value"
-                    value={numVal}
-                    onChange={(e) => setNumVal(e.target.value)}
-                  />
+                  <div className="w-full border rounded 
+                  focus-within:ring-2 focus-within:ring-lime-400">
+                    <input
+                      type="number"
+                      className="w-full bg-transparent px-3 py-1.5 text-xs sm:text-sm focus:outline-none"
+                      placeholder="Enter value"
+                      value={numVal}
+                      onChange={(e) => setNumVal(e.target.value)}
+                    />
+                  </div>
                 )}
 
                 {/* Apply Button */}
