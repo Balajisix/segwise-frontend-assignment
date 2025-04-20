@@ -1,343 +1,214 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
 import csvText from "../data/creatives.csv?raw";
-import { ChevronDown, ChevronRight, Funnel, Search, Trash2 } from "lucide-react";
+import {
+  Funnel,
+  ChevronDown,
+  Search as SearchIcon,
+  Trash2,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 type Tab = "Dimensions" | "Tags" | "Metrics";
-type ComparisonOperator =
-  | "equals"
-  | "lesser than"
-  | "greater than"
-  | "contains"
-  | "does not contain"
-  | "is"
-  | "is not";
-
-interface ColDef {
-  name: string;
-  type: Tab;
-}
-
+interface ColDef { name: string; type: Tab; }
 export interface FilterItem {
   category: ColDef;
-  operator: ComparisonOperator;
+  operator: string;
   value: string | string[];
   isNumeric: boolean;
 }
-
-interface FilterBarProps {
+interface Props {
   onFiltersChange: (filters: FilterItem[], logic: "AND" | "OR") => void;
 }
 
-export const FilterBar: React.FC<FilterBarProps> = ({ onFiltersChange }) => {
-  const [cols, setCols] = useState<ColDef[]>([]);
-  const [data, setData] = useState<Record<string, any>[]>([]);
-
-  useEffect(() => {
-    const { data: rows, meta } = Papa.parse<Record<string, any>>(csvText, {
-      header: true,
-      skipEmptyLines: true,
-    });
-    const metricKeys = [
-      "ipm",
-      "ctr",
-      "spend",
-      "impressions",
-      "clicks",
-      "cpm",
-      "cost_per_click",
-      "cost_per_install",
-      "installs",
-    ];
-    const fields = meta.fields || [];
-    const defs = fields.map((h) => {
-      const key = h.trim().toLowerCase();
-      if (key.includes("tag")) return { name: h, type: "Tags" as Tab };
-      if (metricKeys.includes(key)) return { name: h, type: "Metrics" as Tab };
-      return { name: h, type: "Dimensions" as Tab };
-    });
-    setCols(defs);
-    setData(rows);
-  }, []);
-
+export const FilterBar: React.FC<Props> = ({ onFiltersChange }) => {
+  // These are states for UI
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
+  const [activeTab, setActiveTab] = useState<Tab>("Tags");
   const [pending, setPending] = useState<FilterItem[]>([]);
   const [logic, setLogic] = useState<"AND" | "OR">("AND");
 
-  const [tab, setTab] = useState<Tab>("Tags");
+  // This is for Data and schema
+  const [cols, setCols] = useState<ColDef[]>([]);
+  const [rows, setRows] = useState<Record<string, any>[]>([]);
+
   const [searchCol, setSearchCol] = useState("");
-  const [col, setCol] = useState<ColDef | null>(null);
+  const [selectedCol, setSelectedCol] = useState<ColDef | null>(null);
 
-  const [op, setOp] = useState<ComparisonOperator>("is");
-  const [opOpen, setOpOpen] = useState(false);
   const [searchVal, setSearchVal] = useState("");
-  const [numVal, setNumVal] = useState("");
-  const [selectedValues, setSelectedValues] = useState<string[]>([]);
+  const [operator, setOperator] = useState<string>("");
+  const [radioVal, setRadioVal] = useState(""); // For tags (single selection)
+  const [multiVals, setMultiVals] = useState<string[]>([]); // For dimensions (multi-select)
+  const [textVal, setTextVal] = useState(""); // For dimensions (contains/does not contain)
+  const [numVal, setNumVal] = useState(""); // For metrics
+  const [valueOptions, setValueOptions] = useState<string[]>([]);
 
-  const countLabel = pending.length.toString().padStart(2, "0");
-
-  const [vals, setVals] = useState<string[]>([]);
-
-  const satisfiesFilter = (row: Record<string, any>, filter: FilterItem): boolean => {
-    const columnValue = row[filter.category.name];
-    if (filter.isNumeric) {
-      const numColumnValue = Number(columnValue);
-      const numFilterValue = Number(filter.value);
-      switch (filter.operator) {
-        case "equals":
-          return numColumnValue === numFilterValue;
-        case "lesser than":
-          return numColumnValue < numFilterValue;
-        case "greater than":
-          return numColumnValue > numFilterValue;
-        default:
-          return false;
-      }
+  // Operators
+  const availableOperators = useMemo(() => {
+    if (selectedCol?.type === "Metrics") {
+      return ["equals", "greater than", "lesser than"];
+    } else if (selectedCol?.type === "Dimensions") {
+      return ["is", "is not", "contains", "does not contain"];
     } else {
-      const strColumnValue = String(columnValue);
-      if (Array.isArray(filter.value)) {
-        if (filter.operator === "is") {
-          return filter.value.some(v => strColumnValue === v);
-        } else if (filter.operator === "is not") {
-          return !filter.value.some(v => strColumnValue === v);
-        } else {
-          return false;
-        }
-      } else {
-        const strFilterValue = String(filter.value);
-        switch (filter.operator) {
-          case "is":
-            return strColumnValue === strFilterValue;
-          case "is not":
-            return strColumnValue !== strFilterValue;
-          case "contains":
-            return strColumnValue.includes(strFilterValue);
-          case "does not contain":
-            return !strColumnValue.includes(strFilterValue);
-          default:
-            return false;
-        }
-      }
+      return ["is"]; // Tags use "is" for radio selection
     }
-  };
+  }, [selectedCol]);
 
+  // It helps to load CSV
   useEffect(() => {
-    if (!col) return;
+    const parsed = Papa.parse<Record<string, any>>(csvText, {
+      header: true,
+      skipEmptyLines: true,
+    });
+    setRows(parsed.data);
 
-    let filteredData = data;
-    if (pending.length > 0) {
-      filteredData = logic === "AND"
-        ? data.filter(row => pending.every(filter => satisfiesFilter(row, filter)))
-        : data.filter(row => pending.some(filter => satisfiesFilter(row, filter)));
-    }
+    const metricKeys = [
+      "ipm", "ctr", "spend", "impressions", "clicks",
+      "cpm", "cost_per_click", "cost_per_install", "installs"
+    ];
+    const defs: ColDef[] = (parsed.meta.fields || []).map((h) => {
+      const key = h.trim().toLowerCase();
+      if (metricKeys.includes(key)) return { name: h, type: "Metrics" };
+      if (key.includes("tag")) return { name: h, type: "Tags" };
+      return { name: h, type: "Dimensions" };
+    });
+    setCols(defs);
+  }, []);
 
-    const all = filteredData
-      .map((r) => r[col.name])
-      .filter((v) => v != null)
-      .map(String);
-    setVals(Array.from(new Set(all)).sort());
-
-    setOp(col.type === "Metrics" ? "equals" : "is");
-    setSearchVal("");
-    setNumVal("");
-    setSelectedValues([]);
-  }, [col, data, pending, logic]);
-
-  useEffect(() => {
-    if (col && col.type !== "Metrics" && selectedValues.length > 1 && !["is", "is not"].includes(op)) {
-      setOp("is");
-    }
-  }, [selectedValues, col, op]);
-
-  const isNumericField = (c: ColDef) => {
-    if (c.type === "Metrics") return true;
-    if (c.name.toLowerCase().endsWith("id")) return true;
-    const sample = data.slice(0, 10).map((r) => r[c.name]).filter((v) => v != null);
-    return sample.length > 0 && sample.every((v) => !isNaN(+v));
-  };
-
-  const handleSave = () => {
-    if (!col) return;
-
-    const numeric = isNumericField(col!);
-    if (numeric) {
-      if (!numVal) return;
-      setPending((p) => [
-        ...p,
-        { category: col!, operator: op, value: numVal, isNumeric: true },
-      ]);
-    } else {
-      if (selectedValues.length === 0) return;
-      setPending((p) => [
-        ...p,
-        {
-          category: col!,
-          operator: op,
-          value: selectedValues,
-          isNumeric: false,
-        },
-      ]);
-    }
-
-    setCol(null);
-    setTab("Tags");
-  };
-
+  // Filtered Columns
   const filteredCols = useMemo(
     () =>
       cols
-        .filter((c) => c.type === tab)
+        .filter((c) => c.type === activeTab)
         .filter((c) => c.name.toLowerCase().includes(searchCol.toLowerCase())),
-    [cols, tab, searchCol]
+    [cols, activeTab, searchCol]
   );
 
-  const renderValuesStep = () => {
-    if (!col) return null;
-
-    if (isNumericField(col)) {
-      return (
-        <input
-          type="number"
-          value={numVal}
-          onChange={(e) => setNumVal(e.target.value)}
-          placeholder="Enter value"
-          className="w-1/2 border rounded-md px-3 py-1.5 text-sm"
-        />
-      );
-    } else {
-      return (
-        <>
-          <input
-            value={searchVal}
-            onChange={(e) => setSearchVal(e.target.value)}
-            placeholder="Search values"
-            className="w-full pl-8 pr-3 py-1.5 border rounded-md text-sm"
-          />
-          <div className="flex items-center px-3 py-2">
-            <input
-              type="checkbox"
-              checked={selectedValues.length === vals.length}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setSelectedValues(vals);
-                } else {
-                  setSelectedValues([]);
-                }
-              }}
-              className="rounded border-gray-300"
-            />
-            <span className="ml-2 text-sm font-medium">Select all</span>
-          </div>
-          <ul className="max-h-40 overflow-auto space-y-1 border rounded-md">
-            {vals
-              .filter((v) =>
-                v.toLowerCase().includes(searchVal.toLowerCase())
-              )
-              .map((v) => (
-                <li
-                  key={v}
-                  onClick={() =>
-                    setSelectedValues((prev) =>
-                      prev.includes(v)
-                        ? prev.filter((x) => x !== v)
-                        : [...prev, v]
-                    )
-                  }
-                  className={`flex items-center px-3 py-2 rounded-md text-sm cursor-pointer ${
-                    selectedValues.includes(v)
-                      ? "bg-green-50 text-green-700"
-                      : "hover:bg-gray-100 text-gray-700"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedValues.includes(v)}
-                    readOnly
-                    className="rounded border-gray-300"
-                  />
-                  <span className="ml-2">{v}</span>
-                </li>
-              ))}
-          </ul>
-        </>
-      );
+  // Set Value Options and Operator for Step 2
+  useEffect(() => {
+    if (step === 2 && selectedCol) {
+      const opts = Array.from(
+        new Set(
+          rows
+            .map((r) => r[selectedCol.name])
+            .filter((v) => v != null)
+            .map(String)
+        )
+      ).sort();
+      setValueOptions(opts);
+      setOperator(availableOperators[0]);
+      setSearchVal("");
+      setRadioVal("");
+      setMultiVals([]);
+      setTextVal("");
+      setNumVal("");
     }
+  }, [step, selectedCol, rows, availableOperators]);
+
+  // Handle Adding a Filter
+  const handleAddFilter = () => {
+    if (!selectedCol) return;
+    const isNum = selectedCol.type === "Metrics";
+    const val: string | string[] = isNum
+      ? numVal
+      : selectedCol.type === "Tags"
+        ? radioVal
+        : (operator === "is" || operator === "is not")
+          ? multiVals
+          : textVal;
+
+    setPending((p) => [
+      ...p,
+      { category: selectedCol, operator, value: val, isNumeric: isNum },
+    ]);
+
+    if (selectedCol.type === "Tags") {
+      setActiveTab("Dimensions");
+      const creativeCol = cols.find((c) => c.name.toLowerCase() === "creative_name");
+      if (creativeCol) {
+        setSelectedCol(creativeCol);
+        setStep(2);
+        return;
+      }
+    }
+
+    setStep(1);
+    setSelectedCol(null);
   };
 
-  const availableOperators = col
-    ? col.type === "Metrics"
-      ? ["equals", "lesser than", "greater than"]
-      : selectedValues.length > 1
-        ? ["is", "is not"]
-        : ["is", "is not", "contains", "does not contain"]
-    : [];
-
   return (
-    <div className="w-full bg-gray-100 rounded-xl px-4 py-3">
+    <div className="w-full max-w-screen-xl mx-auto bg-gray-100 rounded-xl p-4">
+      {/* Trigger Button */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 bg-white border rounded-xl px-4 py-2 text-sm font-medium shadow hover:bg-gray-100"
+        className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow hover:bg-lime-50 cursor-pointer"
       >
         <Funnel className="w-4 h-4" />
-        <span>Filters</span>
-        <Badge className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-semibold">
-          {countLabel}
-        </Badge>
+        Filters
+        <Badge className="bg-lime-300">{String(pending.length).padStart(2, "0")}</Badge>
         <ChevronDown className="w-4 h-4" />
       </button>
 
       {open && (
         <>
+          {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black bg-opacity-20 z-10"
+            className="fixed inset-0 bg-black bg-opacity-20"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute z-20 mt-2 w-full sm:w-[28rem] bg-white rounded-xl shadow-xl border">
-            <div className="flex justify-between items-center px-4 py-2 border-b">
-              <h3 className="font-medium text-gray-700">Add Filters</h3>
+
+          {/* Panel */}
+          <div className="absolute z-20 mt-2 w-full sm:w-80 bg-white rounded-xl shadow-lg border">
+            {/* Header */}
+            <div className="border-b px-4 py-2">
               <button
+                className="
+                  inline-flex items-center 
+                  px-3 py-1 
+                  bg-green-50 border border-green-200 
+                  rounded-full 
+                  text-green-700 font-medium text-sm 
+                  hover:bg-green-100
+                "
                 onClick={() => {
                   onFiltersChange(pending, logic);
                   setOpen(false);
                 }}
-                className="text-green-600 text-sm font-semibold hover:underline"
               >
-                Apply All
+                <span className="mr-1 font-bold text-lg">+</span>
+                Add Filter
               </button>
             </div>
 
-            <div className="p-4 space-y-2">
-              {pending.map((r, i) => (
+            {/* Pending Filters */}
+            <div className="p-3 space-y-2">
+              {pending.map((f, i) => (
                 <div
                   key={i}
-                  className="bg-green-50 border border-green-100 text-green-800 px-3 py-2 rounded-md flex justify-between text-sm"
+                  className="flex justify-between items-center bg-green-50 px-3 py-2 rounded"
                 >
-                  <div>
-                    <span className="font-medium">{r.category.name}</span>{" "}
-                    {r.operator}{" "}
-                    <em className="font-semibold">
-                      {Array.isArray(r.value) ? r.value.join(", ") : r.value}
-                    </em>
+                  <div className="text-sm">
+                    <strong>{f.category.name}</strong> {f.operator}{" "}
+                    <em>{Array.isArray(f.value) ? f.value.join(", ") : f.value}</em>
                   </div>
                   <button
-                    onClick={() =>
-                      setPending((p) => p.filter((_, idx) => idx !== i))
-                    }
+                    onClick={() => setPending((p) => p.filter((_, idx) => idx !== i))}
                   >
-                    <Trash2 className="w-4 h-4 hover:text-red-600" />
+                    <Trash2 className="w-4 h-4 text-gray-500 hover:text-red-600" />
                   </button>
                 </div>
               ))}
-              {pending.length >= 2 && (
-                <div className="flex justify-center space-x-2 py-2">
+
+              {pending.length > 1 && (
+                <div className="flex justify-center gap-2">
                   {(["AND", "OR"] as const).map((L) => (
                     <button
                       key={L}
                       onClick={() => setLogic(L)}
-                      className={`px-3 py-1 text-xs rounded-md ${
+                      className={`px-3 py-1 text-xs rounded ${
                         logic === L
-                          ? "bg-gray-100 text-gray-800 font-semibold"
+                          ? "bg-gray-200 text-gray-800 font-semibold"
                           : "text-gray-500 hover:bg-gray-50"
                       }`}
                     >
@@ -348,105 +219,217 @@ export const FilterBar: React.FC<FilterBarProps> = ({ onFiltersChange }) => {
               )}
             </div>
 
-            {!col ? (
+            {/* Category Selection */}
+            {step === 1 && (
               <>
-                <div className="grid grid-cols-3 border-b">
+                <div className="grid grid-cols-3 text-center border-b">
                   {(["Dimensions", "Tags", "Metrics"] as Tab[]).map((t) => (
                     <button
                       key={t}
                       onClick={() => {
-                        setTab(t);
+                        setActiveTab(t);
                         setSearchCol("");
                       }}
                       className={`py-2 text-sm ${
-                        tab === t
-                          ? "text-gray-800 font-semibold border-b-2 border-green-500"
-                          : "text-gray-500"
+                        activeTab === t
+                          ? "font-semibold border-b-2 border-green-500 text-gray-800"
+                          : "text-gray-500 hover:bg-gray-50"
                       }`}
                     >
                       {t}
                     </button>
                   ))}
                 </div>
-                <div className="p-4 space-y-2">
+                <div className="p-3 space-y-2">
                   <div className="relative">
+                    <SearchIcon className="absolute left-2 top-2 w-4 h-4 text-gray-400" />
                     <input
+                      className="w-full pl-8 pr-3 py-1.5 border rounded text-sm focus:bg-yellow-50"
+                      placeholder="Search"
                       value={searchCol}
                       onChange={(e) => setSearchCol(e.target.value)}
-                      placeholder="Search"
-                      className="w-full pl-8 pr-3 py-1.5 border rounded-md text-sm"
                     />
-                    <Search className="absolute left-2 top-1.5 w-4 h-4 text-gray-400" />
                   </div>
                   <ul className="max-h-40 overflow-auto space-y-1">
                     {filteredCols.map((c) => (
                       <li
                         key={c.name}
-                        onClick={() => setCol(c)}
-                        className="flex justify-between items-center px-3 py-2 hover:bg-green-50 rounded-md cursor-pointer text-sm"
+                        onClick={() => {
+                          setSelectedCol(c);
+                          setStep(2);
+                        }}
+                        className="flex justify-between px-3 py-2 hover:bg-green-50 rounded cursor-pointer text-sm"
                       >
                         {c.name}
-                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                        <ChevronDown className="w-4 h-4 text-gray-400 rotate-270" />
                       </li>
                     ))}
                   </ul>
                 </div>
               </>
-            ) : (
+            )}
+
+            {/* Value Selection */}
+            {step === 2 && selectedCol && (
               <div className="p-4 space-y-4">
                 <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-2 text-sm font-medium">
-                    <span>{col.type}</span>
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
-                    <span className="font-semibold">{col.name}</span>
-                  </div>
                   <button
-                    className="text-xs text-gray-500"
-                    onClick={() => setCol(null)}
+                    className="text-sm text-gray-500 hover:underline"
+                    onClick={() => {
+                      setStep(1);
+                      setSelectedCol(null);
+                    }}
                   >
                     ← Back
                   </button>
+                  <h4 className="text-sm font-semibold text-gray-700">
+                    {selectedCol.name}
+                  </h4>
                 </div>
 
-                <div className="relative w-1/2">
-                  <button
-                    onClick={() => setOpOpen((o) => !o)}
-                    className="w-full flex justify-between items-center border rounded-md px-3 py-1.5 text-sm"
-                  >
-                    <span className="capitalize">{op}</span>
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  </button>
-                  {opOpen && (
-                    <ul className="absolute left-0 right-0 z-30 mt-1 bg-white border rounded-md shadow-lg">
-                      {availableOperators.map((o) => (
-                        <li
-                          key={o}
-                          onClick={() => {
-                            setOp(o as ComparisonOperator);
-                            setOpOpen(false);
-                          }}
-                          className="px-3 py-1.5 hover:bg-gray-100 cursor-pointer capitalize text-sm"
-                        >
-                          {o}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                {/* Operator Dropdown */}
+                <select
+                  value={operator}
+                  onChange={(e) => setOperator(e.target.value)}
+                  className="w-full border rounded px-3 py-1.5 text-sm focus:bg-yellow-50"
+                >
+                  {availableOperators.map((op) => (
+                    <option key={op} value={op}>
+                      {op}
+                    </option>
+                  ))}
+                </select>
 
-                {renderValuesStep()}
+                {/* Tags */}
+                {selectedCol.type === "Tags" && (
+                  <>
+                    <div className="relative">
+                      <SearchIcon className="absolute left-2 top-2 w-4 h-4 text-gray-400" />
+                      <input
+                        className="w-full pl-8 pr-3 py-1.5 border rounded text-sm focus:bg-yellow-50"
+                        placeholder="Search"
+                        value={searchVal}
+                        onChange={(e) => setSearchVal(e.target.value)}
+                      />
+                    </div>
+                    <div className="max-h-40 overflow-auto space-y-1 border rounded p-2">
+                      {valueOptions
+                        .filter((v) => v.toLowerCase().includes(searchVal.toLowerCase()))
+                        .map((v) => (
+                          <label
+                            key={v}
+                            className={`flex items-center px-2 py-1 rounded cursor-pointer ${
+                              radioVal === v ? "bg-green-50 text-green-700" : "hover:bg-gray-50"
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="tagRadio"
+                              className="mr-2"
+                              checked={radioVal === v}
+                              onChange={() => setRadioVal(v)}
+                            />
+                            {v}
+                          </label>
+                        ))}
+                    </div>
+                  </>
+                )}
 
+                {/* Dimensions */}
+                {selectedCol.type === "Dimensions" && (
+                  operator === "is" || operator === "is not" ? (
+                    <>
+                      <div className="relative">
+                        <SearchIcon className="absolute left-2 top-2 w-4 h-4 text-gray-400" />
+                        <input
+                          className="w-full pl-8 pr-3 py-1.5 border rounded text-sm focus:bg-yellow-50"
+                          placeholder="Search"
+                          value={searchVal}
+                          onChange={(e) => setSearchVal(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={multiVals.length === valueOptions.length}
+                          onChange={(e) =>
+                            setMultiVals(e.target.checked ? valueOptions : [])
+                          }
+                        />
+                        <span className="text-sm">Select all</span>
+                      </div>
+                      <div className="max-h-40 overflow-auto space-y-1 border rounded p-2">
+                        {valueOptions
+                          .filter((v) => v.toLowerCase().includes(searchVal.toLowerCase()))
+                          .map((v) => (
+                            <label
+                              key={v}
+                              className={`flex items-center px-2 py-1 rounded cursor-pointer ${
+                                multiVals.includes(v)
+                                  ? "bg-green-50 text-green-700"
+                                  : "hover:bg-gray-50"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="mr-2"
+                                checked={multiVals.includes(v)}
+                                onChange={() =>
+                                  setMultiVals((m) =>
+                                    m.includes(v)
+                                      ? m.filter((x) => x !== v)
+                                      : [...m, v]
+                                  )
+                                }
+                              />
+                              {v}
+                            </label>
+                          ))}
+                      </div>
+                    </>
+                  ) : (
+                    <input
+                      type="text"
+                      className="w-full border rounded px-3 py-1.5 text-sm focus:bg-yellow-50"
+                      placeholder="Enter text"
+                      value={textVal}
+                      onChange={(e) => setTextVal(e.target.value)}
+                    />
+                  )
+                )}
+
+                {/* Metrics */}
+                {selectedCol.type === "Metrics" && (
+                  <input
+                    type="number"
+                    className="w-full border rounded px-3 py-1.5 text-sm focus:bg-yellow-50"
+                    placeholder="Enter value"
+                    value={numVal}
+                    onChange={(e) => setNumVal(e.target.value)}
+                  />
+                )}
+
+                {/* Apply Button */}
                 <button
-                  onClick={handleSave}
+                  onClick={handleAddFilter}
                   disabled={
-                    isNumericField(col!) ? !numVal : selectedValues.length === 0
+                    selectedCol.type === "Metrics"
+                      ? numVal === ""
+                      : selectedCol.type === "Tags"
+                      ? radioVal === ""
+                      : (operator === "is" || operator === "is not")
+                      ? multiVals.length === 0
+                      : textVal === ""
                   }
-                  className={`w-full py-2 rounded-md text-sm font-medium ${
-                    isNumericField(col!)
+                  className={`w-full py-2 rounded text-sm font-medium ${
+                    (selectedCol.type === "Metrics"
                       ? numVal
-                        ? "bg-green-600 text-white hover:bg-green-700"
-                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                      : selectedValues.length
+                      : selectedCol.type === "Tags"
+                      ? radioVal
+                      : (operator === "is" || operator === "is not")
+                      ? multiVals.length > 0
+                      : textVal)
                       ? "bg-green-600 text-white hover:bg-green-700"
                       : "bg-gray-200 text-gray-400 cursor-not-allowed"
                   }`}

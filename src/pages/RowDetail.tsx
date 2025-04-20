@@ -57,7 +57,7 @@ const RowDetail: React.FC = () => {
     navigate(-1);
   };
 
-  // Separate numeric fields and text fields for better organization
+  // Separate numeric fields and text fields
   const numericFields = rowData ? 
     Object.entries(rowData)
       .filter(([key, value]) => typeof value === 'number' && !isNaN(value as number) && key !== 'id')

@@ -30,7 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-// Enhanced chart config with richer colors
+// Chart Config for colors
 const chartConfig = {
   spends: {
     label: "Spend",
@@ -67,7 +67,7 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
   const [isMobile, setIsMobile] = useState(false);
   const [screenWidth, setScreenWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
 
-  // Handle responsive detection
+  // It handles the responsive layout of the graph data
   useEffect(() => {
     const handleResize = () => {
       setScreenWidth(window.innerWidth);
@@ -174,7 +174,7 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
     });
   };
 
-  // Custom tooltip component with enhanced styling
+  // Custom tooltip component
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -202,7 +202,7 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
     return null;
   };
 
-  // Enhanced legend component
+  // Legend component
   const CustomLegend = ({ payload }: any) => {
     return (
       <div className="flex flex-wrap justify-center gap-2 sm:gap-5 mt-1 sm:mt-3 px-1">
@@ -243,7 +243,6 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
       ? { top: 20, right: 20, left: 15, bottom: 80 }
       : { top: 20, right: 30, left: 20, bottom: 80 };
 
-  // Decide whether to show both Y axes on small screens
   const showRightYAxis = !isMobile || isFullscreen;
 
   return (
@@ -641,14 +640,14 @@ const ChartView: React.FC<ChartViewProps> = ({ data, viewMode: initialViewMode }
         )}
         
         
-{isMobile && data.length > 6 && (
-  <div className="mt-4 text-center">
-    <p className="text-xs text-gray-500">
-      Showing {chartData.length} of {data.length} items. 
-      {!isFullscreen && <span> Tap fullscreen for complete view.</span>}
-    </p>
-  </div>
-)}
+        {isMobile && data.length > 6 && (
+          <div className="mt-4 text-center">
+            <p className="text-xs text-gray-500">
+              Showing {chartData.length} of {data.length} items. 
+              {!isFullscreen && <span> Tap fullscreen for complete view.</span>}
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

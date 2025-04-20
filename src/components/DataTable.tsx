@@ -127,7 +127,7 @@ const DataTable = <Row extends Record<string, any>>({
           <div className="flex flex-col sm:flex-row gap-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 lg:h-9">
+                <Button variant="outline" size="sm" className="h-8 lg:h-9 cursor-pointer">
                   Columns
                 </Button>
               </DropdownMenuTrigger>
@@ -247,6 +247,7 @@ const DataTable = <Row extends Record<string, any>>({
           </div>
           <div className="flex items-center space-x-2">
             <Button
+              className="cursor-pointer"
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
@@ -272,7 +273,7 @@ const DataTable = <Row extends Record<string, any>>({
                     key={pageNum}
                     variant={pageNum === currentPage ? "default" : "outline"}
                     size="sm"
-                    className="h-8 w-8"
+                    className="h-8 w-8 cursor-pointer"
                     onClick={() => setCurrentPage(pageNum)}
                   >
                     {pageNum}
@@ -281,6 +282,7 @@ const DataTable = <Row extends Record<string, any>>({
               })}
             </div>
             <Button
+              className="cursor-pointer"
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
