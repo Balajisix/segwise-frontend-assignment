@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import Footer from "../components/Footer";
-import { ArrowLeft, TrendingUp, BarChart, PieChart } from "lucide-react";
+import { ArrowLeft, TrendingUp, BarChart, PieChart, LineChart } from "lucide-react";
 import logo from "../assets/logo.svg";
 import { Link } from "react-router-dom";
 import { CreativeRow } from "./Home";
 import Papa from "papaparse";
 import csvText from "../data/creatives.csv?raw";
+import ChartView from "../components/ChartView";
 
 interface RowData {
   [key: string]: string | number | boolean | null;
@@ -16,13 +17,15 @@ interface RowData {
 const RowDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { from } = (location.state || {}) as { from?: string };
   const [rowData, setRowData] = useState<RowData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
-    // Parse CSV and find the specific row
+    // Parse CSV
     try {
       const res = Papa.parse<CreativeRow>(csvText, {
         header: true,
@@ -54,7 +57,11 @@ const RowDetail: React.FC = () => {
   }, [id]);
 
   const handleBack = () => {
-    navigate(-1);
+    if(from === 'table'){
+      navigate('/', { state: { initialTab: 'table' } });
+    } else {
+      navigate(-1)
+    }
   };
 
   // Separate numeric fields and text fields
@@ -79,6 +86,21 @@ const RowDetail: React.FC = () => {
       return (currentVal > highestVal ? field : highest);
     }, numericFields[0]) 
     : null;
+
+  // Prepare data for the ChartView component
+  const prepareChartData = (): CreativeRow[] => {
+    if (!rowData) return [];
+    
+    return [{
+      id: Number(id),
+      creative_name: rowData.creative_name as string || `Row ${id}`,
+      campaign: rowData.campaign as string || '',
+      spend: rowData.spend as number || 0,
+      impressions: rowData.impressions as number || 0,
+      clicks: rowData.clicks as number || 0,
+      installs: rowData.installs as number || 0,
+    }];
+  };
 
   const renderMetricCard = (field: string, index: number) => {
     if (!rowData) return null;
@@ -199,7 +221,7 @@ const RowDetail: React.FC = () => {
             <div className="mb-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between">
                 <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-                  Row #{id} Details
+                  {rowData.creative_name ? String(rowData.creative_name) : `Row #${id}`} Details
                 </h1>
               </div>
             </div>
@@ -217,6 +239,13 @@ const RowDetail: React.FC = () => {
                 onClick={() => setActiveTab('details')}
               >
                 All Details
+              </button>
+              <button 
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center ${activeTab === 'chart' ? 'bg-blue-100 text-blue-800' : 'text-gray-600 hover:bg-gray-100 cursor-pointer'}`}
+                onClick={() => setActiveTab('chart')}
+              >
+                <LineChart className="w-4 h-4 mr-1" />
+                Performance Chart
               </button>
             </div>
 
@@ -264,6 +293,44 @@ const RowDetail: React.FC = () => {
                     .filter(([key]) => key !== 'id')
                     .map(([key, value]) => renderDetailItem(key, value))
                   }
+                </div>
+              </div>
+            )}
+
+            {/* Chart View Tab */}
+            {activeTab === 'chart' && (
+              <div className="space-y-6">
+                <ChartView 
+                  data={prepareChartData()} 
+                  viewMode="summary" 
+                />
+                
+                <div className="bg-white p-6 rounded-xl shadow-md">
+                  <h3 className="text-lg font-medium mb-3 text-gray-800">Performance Insights</h3>
+                  <p className="text-gray-600">
+                    This chart displays the performance metrics for {rowData.creative_name ? String(rowData.creative_name) : `Row #${id}`}. 
+                    You can toggle between different chart types and metrics using the controls above.
+                  </p>
+                  
+                  {/* Key metrics in context */}
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <div className="text-sm text-gray-600">Spend</div>
+                      <div className="text-xl font-semibold text-blue-700">${rowData.spend || 0}</div>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <div className="text-sm text-gray-600">Impressions</div>
+                      <div className="text-xl font-semibold text-purple-700">{rowData.impressions || 0}</div>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <div className="text-sm text-gray-600">Clicks</div>
+                      <div className="text-xl font-semibold text-green-700">{rowData.clicks || 0}</div>
+                    </div>
+                    <div className="bg-amber-50 p-4 rounded-lg">
+                      <div className="text-sm text-gray-600">Installs</div>
+                      <div className="text-xl font-semibold text-amber-700">{rowData.installs || 0}</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

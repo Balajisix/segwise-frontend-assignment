@@ -8,25 +8,37 @@ import Footer from "../components/Footer";
 import logo from "../assets/logo.svg";
 import csvText from "../data/creatives.csv?raw";
 import { BarChart2, Table as TableIcon, X, Maximize2 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 export interface CreativeRow {
   [key: string]: string | number;
   id: number;
 }
 
+type LocationState = { initialTab?: 'chart' | 'table' };
+
 const Home: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { initialTab } = (location.state || {}) as LocationState;
+  const defaultView = initialTab === 'table' ? 'table' : 'summary';
   const [tableData, setTableData] = useState<CreativeRow[]>([]);
   const [filteredData, setFilteredData] = useState<CreativeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [previewRow, setPreviewRow] = useState<CreativeRow | null>(null);
   const [activeFilters, setActiveFilters] = useState<FilterItem[]>([]); void(activeFilters);
-  const [viewMode, setViewMode] = useState<"summary" | "table">("summary");
+  const [viewMode, setViewMode] = useState<"summary" | "table">(defaultView);
   const [logic, setLogic] = useState<"AND" | "OR">("AND"); void(logic);
   // Add state to track if filter is open
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  useEffect(() => {
+    if (initialTab) {
+      setViewMode(initialTab === 'table' ? 'table' : 'summary');
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [initialTab, location.pathname, navigate]);
   
   // Reload on 'R'
   useEffect(() => {
@@ -122,7 +134,10 @@ const Home: React.FC = () => {
   // Handle navigation to row detail page
   const handleViewRowDetail = (row: CreativeRow) => {
     if (row.id !== undefined) {
-      navigate(`/row/${row.id}`);
+      navigate(
+        `/row/${row.id}`,
+        { state: { from: 'table' } }
+      );
     }
   };
 
